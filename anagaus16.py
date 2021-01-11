@@ -1,8 +1,10 @@
 from argparse import ArgumentParser
 import os
 import re
-import numpy as np
+import csv
 
+
+# import numpy as np
 # from collections import defaultdict
 # from pathlib import Path
 
@@ -10,29 +12,87 @@ import numpy as np
 def init():
     parser = ArgumentParser()
     parser.add_argument("dirname", help="Give name of directory with Gaussian output files")
-    # todo add options for: split name; add csv + optional name; fc/es/gs force; file or dir; ...
+    parser.add_argument("-v", help="Output to stdout, no csv-output, unless -o or -w specified", action="store_true")
+    parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
+    parser.add_argument("-o", "--outfile", help="Give name of csv-file")
+    # todo add options for: split name; fc/es/gs force; ...
     args = parser.parse_args()
+    fileflag = False
     if args.dirname[0] in ('/', '~'):
         dirname = args.dirname
     else:
         dirname = os.getcwd() + '/' + args.dirname
     if dirname[-1] != '/':
-        dirname = dirname + '/'
-    main(dirname)
+        if os.path.isfile(dirname):
+            fileflag = os.path.basename(dirname)
+            dirname = os.path.dirname(dirname) + '/'
+        else:
+            dirname = dirname + '/'
+    if args.outfile:
+        if re.search("[.]csv$", args.outfile):
+            csvname = str("".join(args.outfile.split('.')[:-1]))
+        else:
+            csvname = str(args.outfile)
+    else:
+        csvname = 'results'
+    main(dirname, outname=csvname, onefile=fileflag)
+    if args.v:
+        with open(dirname + csvname + '.csv', 'r') as csvfile:
+            [print(line.rstrip()) for line in csvfile.readlines()]
+        if not args.w and not args.outfile:
+            os.remove(dirname + csvname + '.csv')
 
 
-def main(alldir):
+def main(alldir, outname='results', onefile=None):
     files_all = os.listdir(alldir)
     files_all.sort()
-    nfind = ['Name', ['EE+ZPE', 'ZPE'], ['emmE-eV', 'f', 'ESE'], ['i ->f, coef']]
-    print(np.hstack(nfind))
-    # with open(allmap+'mycsv.csv', 'w', newline='') as f:
-    #     thewriter = csv.writer(f)
-    #     thewriter.writerow(np.hstack(nfind))
-    for allvar in files_all:
-        if re.search("[.]log", allvar):
-            start_ana(alldir + allvar)
-            break
+    if onefile is not None:
+        files_all = [onefile]
+
+    def log1out(infile, outfile):
+        name = infile.split('/')[-1].replace('.log', '')
+        print(name)  # , filedict)
+        filedict = start_ana(infile)
+        row1 = [name, filedict['genprops']['o/f'], filedict['genprops']['time'], filedict['genprops']['imag']]
+        if filedict['gsprops'] is not None:
+            row1.append(filedict['gsprops']['gse'])
+            row1.append(filedict['gsprops']['zpe'])
+        elif filedict['esprops'] is not None:
+            es = filedict['esprops']['es_opt']
+            row1.append(filedict['esprops']['ese'])
+            row1.append(filedict['esprops']['zpe'])
+            row1.append(es)
+            row1.append(filedict['esprops']['esdict'][es]['emmE-eV'])
+            row1.append(filedict['esprops']['esdict'][es]['f'])
+            [row1.append(k) for k in filedict['esprops']['esdict'][es]['ifcoefs']]
+        outfile.writerow(row1)
+
+    def logFCout(infile, outfile):
+        name = infile.split('/')[-1].replace('.log', '')
+        print(name)  # , filedict)
+        filedict = start_ana(infile)
+        outfile.writerow(
+            [name, filedict['genprops']['o/f'], filedict['genprops']['time'], filedict['genprops']['imag']])
+        maxes = len(filedict['esprops']['esdict'])
+        for k in range(1, maxes + 1):
+            rowk = [name + '+' + str(k), "", "", ""]
+            if k == filedict['esprops']['es_opt']:
+                [rowk.append(elem) for elem in [filedict['esprops']['ese'], filedict['esprops']['zpe'], "fc" + str(k)]]
+            else:
+                [rowk.append(elem) for elem in ["", "", "fc" + str(k)]]
+            rowk.append(filedict['esprops']['esdict'][k]['emmE-eV'])
+            rowk.append(filedict['esprops']['esdict'][k]['f'])
+            [rowk.append(k) for k in filedict['esprops']['esdict'][k]['ifcoefs']]
+            outfile.writerow(rowk)
+
+    with open(alldir + outname + '.csv', 'w') as f:
+        csvw = csv.writer(f)
+        csvw.writerow(['name', 'o/f', 'time', 'imag', 'gse/ese', 'zpe', 'esopt', 'emmE-eV', 'f', 'ifcoefs'])
+        for allvar in files_all:
+            if re.search("[Ff][Cc].*[.]log", allvar):
+                logFCout(alldir + allvar, csvw)
+            elif re.search("[.]log", allvar):
+                log1out(alldir + allvar, csvw)
 
 
 def dhms2time(d, h, m, s):
@@ -41,7 +101,8 @@ def dhms2time(d, h, m, s):
 
 def start_ana(totfile):
     # Todo imag=None vs =0 --> difference in 0 and not finished (probably already possible with flags)
-    filedic = {'gsprops': None, 'esprops': None, 'genprops': {'time': [], 'o/f': '', 'imag': None}}
+    # possibly imag=0 if of=True and el=2
+    filedic = {'gsprops': None, 'esprops': None, 'genprops': {'time': 0, 'o/f': '', 'imag': None}}
     with open(totfile, "r") as fl:
         of_flag = False
         oc_flag = 0
@@ -64,12 +125,10 @@ def start_ana(totfile):
                 imag_match = re.search(r"[*]{6} +([0-9]+) imaginary frequencies \(negative Signs\) [*]{6}", line)
                 if imag_match is not None:
                     imag_num = int(imag_match.group(1))
-                    # print(imag_num)
                     filedic['genprops']['imag'] = imag_num
             if re.search('Elapsed', line):
                 el_time.append(dhms2time(line.split()[2], line.split()[4], line.split()[6], line.split()[8]))
-                # print('t=', el_time)
-                filedic['genprops']['time'] = el_time
+                filedic['genprops']['time'] = sum(el_time)
                 el_flag = el_flag + 1
             if re.search('This state for optimization and[/]or second-order correction[.]', line):
                 es_flag = True
@@ -79,15 +138,14 @@ def start_ana(totfile):
                 if es_opt < num and not es_flag:
                     es_opt = num
                 if es_max <= num:
-                    # em_num = linenumber
                     es_max = num
             if re.search('Error termination', line):
                 er_flag = True
     if er_flag:
-        print('Warning: terminated with error, values are probably wrong!')
+        print('    --> Warning: terminated with error, values are probably wrong!')
     if of_flag:
         if oc_flag < el_flag:
-            print('Warning: opt not converged!')
+            print('    --> Warning: opt not converged!')
         if es_flag:
             filedic = es_ana(totfile, filedic, es_opt, es_max, eslines[-1 * es_max:])
         if not es_flag:
@@ -96,14 +154,13 @@ def start_ana(totfile):
         if es_flag:
             filedic = es_ana(totfile, filedic, es_opt, es_max, eslines[-1 * es_max:], of=False)
 
-    filedic['genprops']['o/f'] = 'of=%s; oc=%s' % (of_flag, oc_flag)
+    filedic['genprops']['o/f'] = 'of=%s-oc=%s' % (of_flag, oc_flag)
     return filedic
 
 
 def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
     zpe_corr, ese_sum = 0, 0
     esdict = {i: {'emmE-eV': 0, 'emmE-nm': 0, 'f': 0, 's^2': 0, 'ifcoefs': None} for i in range(1, es_max + 1)}
-    # print(es_opt, es_max, linenums)
     with open(totfile, "r") as fl:
         ifs_flag = False
         for i, line in enumerate(fl):
@@ -114,7 +171,6 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
             tde_match = re.search(r"^ Total Energy, E\(TD-HF/TD-DFT\) = +([0-9.-]+)", line)
             if tde_match is not None:
                 tde = float(tde_match.group(1))
-                # print('tde=', tde)
             es_match = re.search(r"^ Excited State +([0-9]+): +(\S+) +([0-9.-]+) eV +([0-9.-]+) nm +f=([0-9.-]+) "
                                  r"+<S\*\*2>=([0-9.-]+)", line)
             if ifs_flag:
@@ -132,14 +188,15 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
                 esdict[es_num]['emmE-nm'] = float(es_match.group(4))
                 esdict[es_num]['f'] = float(es_match.group(5))
                 esdict[es_num]['s^2'] = float(es_match.group(6))
-                # print(es_match.group(*range(1, 7)))
                 ifs_flag = True
                 ifs_mat = []
 
-    if of and round(float(tde + zpe_corr), 5) != round(ese_sum, 5):
-        print('huh?')
-    # print(esdict)
-    # esdict = {}
+    if round(float(tde + zpe_corr), 5) != round(ese_sum, 5):
+        if of:
+            print('huh?')
+        else:
+            ese_sum = tde
+            zpe_corr = 'No Freq!'
     dic['esprops'] = {'ese': ese_sum, 'zpe': zpe_corr, 'es_opt': es_opt, 'esdict': esdict}
     return dic
 
@@ -150,10 +207,8 @@ def sezpe(line, old_vals):
     se_match = re.search(r"^ Sum of electronic and zero-point Energies=[ ]+([0-9.-]+)", line)
     if zpe_match is not None:
         zpe_corr = float(zpe_match.group(1))
-        # print(zpe_corr)
     if se_match is not None:
         se_sum = float(se_match.group(1))
-        # print(se_sum)
     return zpe_corr, se_sum
 
 
@@ -166,19 +221,20 @@ def gs_ana(totfile, dic):
     return dic
 
 
-def tst():
-    t_file = '/home/u0133458/Documents/Calc/testg16/132.log'
-    dic1 = start_ana(t_file)
-    print(dic1)
-    exit()
+# def tst():
+    # main('/home/u0133458/Documents/Calc/testg16/')
+    # main('/home/u0133458/Documents/Calc/bapr2021/5q_mecn/')
+    # t_file = '/home/u0133458/Documents/Calc/testg16/132.log'
+    # dic1 = start_ana(t_file)
+    # print(dic1)
+    # exit()
     # with open('/home/u0133458/Documents/Calc/testg16/114.log', "r") as fl:
-    #     endmatch = re.findall(r"(?:.|\n)*\n [-]{70}\n((?:.|\n)*)(?:\\{3}\n? ?|\\{2}\n \\|\\\n \\{2})@\n\n", fl.read(),
-    #                           re.MULTILINE)
-    #     print(endmatch[0].replace('\n ', ''))
-    #     imag_match = re.search(r"NImag=(.{,3})\\{2}", endmatch[0].replace('\n ', ''))
-    #     print(imag_match.group(1))
+    # endmatch = re.findall(r"(?:.|\n)*\n [-]{70}\n((?:.|\n)*)(?:\\{3}\n? ?|\\{2}\n \\|\\\n \\{2})@\n\n", fl.read(),
+    #                       re.MULTILINE)
+    # print(endmatch[0].replace('\n ', ''))
+    # imag_match = re.search(r"NImag=(.{,3})\\{2}", endmatch[0].replace('\n ', ''))
+    # print(imag_match.group(1))
 
 
 if __name__ == '__main__':
-    # init()
-    tst()
+    init()
