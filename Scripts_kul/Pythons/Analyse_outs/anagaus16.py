@@ -231,6 +231,9 @@ def gs_ana(totfile, dic):
     return dic
 
 
+if __name__ == '__main__':
+    init()
+
 # def tst():
 # main('/home/u0133458/Documents/Calc/testg16/')
 # main('/home/u0133458/Documents/Calc/bapr2021/5q_mecn/')
@@ -245,6 +248,3 @@ def gs_ana(totfile, dic):
 # imag_match = re.search(r"NImag=(.{,3})\\{2}", endmatch[0].replace('\n ', ''))
 # print(imag_match.group(1))
 # /\\\n NImag=\d+\\\\|\\N\n Imag=\d+\\\\|\\NI\n mag=\d+\\\\|\\NIm\n ag=\d+\\\\|\\NIm\n ag=\d+\\\\|\\NIma\n g=\d+\\\\|\\NImag\n =\d+\\\\|\\NImag=\n \d+\\\\|\\NImag=\d+\n \d+\\\\|\\NImag=\d+\n \\\\|\\NImag=\d+\\\n \\|\\NImag=\d+\\\\/gm
-
-if __name__ == '__main__':
-    init()
