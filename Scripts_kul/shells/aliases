@@ -1,0 +1,32 @@
+export SCRPTS=/home/u0133458/PycharmProjects/Scripts_kul
+alias ls='ls --color=auto'
+alias ll='ls -lh'
+alias la='ls -A'
+alias vo='vi -O'
+alias lt='ls -lrt | tail'
+alias ccc='cd ~/Documents/Calc'
+#alias cs='. ~/.cs'
+alias cs=". $SCRPTS/shells/cs"
+alias gabedit=~/GabeditSrc250/gabedit
+alias pip=pip3
+
+alias rsyng='rsync -auv --exclude="*.chk" --exclude="*.fchk"'
+alias rsynh='rsync -auvOh --exclude="*.chk" --progress'
+alias ct1='sshfs t1:/user/leuven/331/vsc33143 ~/sftp/t1/home;sshfs t1:/data/leuven/331/vsc33143 ~/sftp/t1/data; cs ~/sftp/t1/home'
+alias ct2='sshfs t2:/user/leuven/331/vsc33143 ~/sftp/t2/home;sshfs t2:/data/leuven/331/vsc33143 ~/sftp/t2/data; cs ~/sftp/t2/home'
+alias cko="sshfs : ~/sftp/ko -o ssh_command='ssh t1 -t ssh ko'; source ~/.koscripts/ko_aliases; cs ~/sftp/ko"
+alias alko="source ~/.koscripts/ko_aliases"
+
+alias anagaus='python3 $SCRPTS/Pythons/Analyse_outs/anagaus16.py'
+alias i2j='python3 $SCRPTS/Pythons/inscripts/coordscripts.py'
+alias avo=$SCRPTS/shells/avo.sh
+
+#alias wqstko="watch 'ssh ko qstat -u koen'"
+#alias anagaus='python3 /home/u0133458/Documents/PycharmProjects/fps/anagaus_on_demand.py'
+#alias i2j='python3 /home/u0133458/Documents/PycharmProjects/fps/inscripts/coordscripts.py'
+
+#alias junip='sudo openconnect --juniper -u r0584198@kuleuven.be https://extranet.kuleuven.be/b'
+#alias junip=~/Desktop/jun.sh
+#alias ssx='ssh -X koen@dirac.quantchem.kuleuven.be'
+#alias vpnr="nmcli con down id 'VPN A-zone'; nmcli con up id 'VPN A-zone'"
+#alias cko='nmcli con up id "VPN A-zone"; sshfs ko: ~/sftp/ko; source ~/.koscripts/ko_aliases; cs ~/sftp/ko'

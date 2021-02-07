@@ -1,0 +1,78 @@
+# Set up the prompt
+
+autoload -Uz promptinit
+#promptinit
+#prompt adam1
+
+setopt histignorealldups sharehistory
+setopt appendhistory extendedglob
+unsetopt autocd beep
+# Use emacs keybindings even if our EDITOR is set to vi
+bindkey -v
+
+# Keep 1000 lines of history within the shell and save it to ~/.zsh_history:
+HISTSIZE=10000
+SAVEHIST=10000
+HISTFILE=~/.zsh_history
+
+# Use modern completion system
+autoload -Uz compinit
+compinit
+
+zstyle ':completion:*' auto-description 'specify: %d'
+zstyle ':completion:*' completer _expand _complete _correct _approximate
+zstyle ':completion:*' format 'Completing %d'
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' menu select=2
+eval "$(dircolors -b)"
+zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' list-colors ''
+zstyle ':completion:*' list-prompt %SAt %p: Hit TAB for more, or the character to insert%s
+zstyle ':completion:*' matcher-list '' 'm:{a-z}={A-Z}' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=* l:|=*'
+zstyle ':completion:*' menu select=long
+zstyle ':completion:*' select-prompt %SScrolling active: current selection at %p%s
+zstyle ':completion:*' use-compctl false
+zstyle ':completion:*' verbose true
+
+zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
+zstyle ':completion:*:kill:*' command 'ps -u $USER -o pid,%cpu,tty,cputime,cmd'
+
+
+source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+[ -f ~/.aliases ] && . ~/.aliases
+# Remap clear-screen since ^L is taken by tmux-vim
+bindkey "^O" clear-screen
+
+function spwd {
+  paths=(${(s:/:)PWD})
+
+  cur_path='/'
+  cur_short_path='/'
+  for directory in ${paths[@]}
+  do
+    cur_dir=''
+    for (( i=0; i<${#directory}; i++ )); do
+      cur_dir+="${directory:$i:1}"
+      matching=("$cur_path"/"$cur_dir"*/)
+      if [[ ${#matching[@]} -eq 1 ]]; then
+        break
+      fi
+    done
+    cur_short_path+="$cur_dir/"
+    cur_path+="$directory/"
+  done
+
+  enddir=($(basename `pwd`))
+  begdirs=($(printf %q "${cur_short_path: : -1}" | rev | cut -d "/" -f2- | rev ))
+  printf %q "$begdirs/$enddir"
+  echo
+}
+
+setopt PROMPT_SUBST
+#pwd2pr=${"$(spwd)"//\/h\/u01/"~"} 
+PS1='%(?.%F{green}√.%F{red}?%?)%f %F{yellow}SET2%f%B%F{cyan}${"$(spwd)"//\/h\/u0(133458|1)/"~"}%F{white} %# %b%f%k'
+#PS1='%F{yellow}SET2%f%B%F{cyan}%(4~|...|)%3~ $pwd2pr%F{white} %# %b%f%k'
+
+ls
+
+source /home/u0133458/.config/broot/launcher/bash/br

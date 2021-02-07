@@ -162,24 +162,29 @@ def start_ana(totfile):
     if not of_flag:
         if es_flag:
             filedic = es_ana(totfile, filedic, es_opt, es_max, eslines[-1 * es_max:], of=False)
+        else:
+            filedic = gs_ana(totfile, filedic, of=False)
 
     filedic['genprops']['o/f'] = 'of=%s-oc=%s' % (of_flag, oc_flag)
     return filedic
 
 
 def sezpe(line, old_vals):
-    zpe_corr, se_sum = old_vals[0], old_vals[1]
+    zpe_corr, se_sum, scfdone = old_vals[0], old_vals[1], old_vals[2]
     zpe_match = re.search(r"^ Zero-point correction= +([0-9.-]+)", line)
     se_match = re.search(r"^ Sum of electronic and zero-point Energies=[ ]+([0-9.-]+)", line)
+    scfd_match = re.search(r"SCF Done: +E\(.+\) = *([0-9.-]+) +A.U.", line)
     if zpe_match is not None:
         zpe_corr = float(zpe_match.group(1))
     if se_match is not None:
         se_sum = float(se_match.group(1))
-    return zpe_corr, se_sum
+    if scfd_match is not None:
+        scfdone = float(scfd_match.group(1))
+    return zpe_corr, se_sum, scfdone
 
 
 def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
-    zpe_corr, ese_sum = 0, 0
+    zpe_corr, ese_sum, scfdone = 0, 0, 0
     esdict = {i: {'emmE-eV': 0, 'emmE-nm': 0, 'f': 0, 's^2': 0, 'ifcoefs': None} for i in range(1, es_max + 1)}
     with open(totfile, "r") as fl:
         ifs_flag = False
@@ -187,7 +192,7 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
             if i < linenums[0] - 1:
                 continue
             if of:
-                zpe_corr, ese_sum = sezpe(line, [zpe_corr, ese_sum])
+                zpe_corr, ese_sum, scfdone = sezpe(line, [zpe_corr, ese_sum, scfdone])
             # tde_match = re.search(r"^ Total Energy, E\(TD-HF/TD-DFT\) = +([0-9.-]+)", line)
             tde_match = re.search(r"^ Total Energy, E\(.+\) = +([0-9.-]+)", line)
             if tde_match is not None:
@@ -195,7 +200,7 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
             es_match = re.search(r"^ Excited State +([0-9]+): +(\S+) +([0-9.-]+) eV +([0-9.-]+) nm +f=([0-9.-]+) "
                                  r"+<S\*\*2>=([0-9.-]+)", line)
             if ifs_flag:
-                ifcoef_match = re.search(r" +([0-9]{1,3}) (->|<-) ([0-9]{1,3}) +([0-9.-]+)", line)
+                ifcoef_match = re.search(r" +([0-9]{1,3}) (->|<-) ?([0-9]{1,3}) +([0-9.-]+)", line)
                 if ifcoef_match is not None:
                     # print(ifcoef_match.group(1, 3, 4))
                     ifcoefslist = [int(ifcoef_match.group(1)), int(ifcoef_match.group(3)), float(ifcoef_match.group(4))]
@@ -212,9 +217,11 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
                 ifs_flag = True
                 ifs_mat = []
 
-    if round(float(tde + zpe_corr), 5) != round(ese_sum, 5):
+    ediff1 = round(float(tde + zpe_corr - ese_sum), 4)
+    ediff2 = round(float(scfdone + esdict[es_num]['emmE-eV']/27.212 - tde))
+    if ediff1 != 0 or ediff2 != 0:
         if of:
-            print('huh?')
+            print('huh? calc not finished?\n   --> Ediff = %f\n   --> Ediff2 = %f' % (ediff1, ediff2))
         else:
             ese_sum = tde
             zpe_corr = 'No Freq!'
@@ -222,12 +229,18 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
     return dic
 
 
-def gs_ana(totfile, dic):
-    zpe_corr, gse_sum = 0, 0
+def gs_ana(totfile, dic, of=True):
+    zpe_corr, gse_sum, scfdone = 0, 0, 0
     with open(totfile, "r") as fl:
         for line in fl:
-            zpe_corr, gse_sum = sezpe(line, [zpe_corr, gse_sum])
-    dic['gsprops'] = {'gse': gse_sum, 'zpe': zpe_corr}
+            zpe_corr, gse_sum, scfdone = sezpe(line, [zpe_corr, gse_sum, scfdone])
+    ediff = round(scfdone + zpe_corr - gse_sum, 4)
+    if of:
+        dic['gsprops'] = {'gse': gse_sum, 'zpe': zpe_corr}
+        if ediff != 0:
+            print('Calc not finished?\n  --> Ediff = %f' % ediff)
+    else:
+        dic['gsprops'] = {'gse': scfdone, 'zpe': 'No Freq! SCFDone'}
     return dic
 
 

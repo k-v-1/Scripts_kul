@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+## version 4.0 - for use on SET
+#
+##TODO Does not work --> wrong folder system...
+#
+
+#TODO use case for options (such as v=g16a03)
+#TODO use zsh? --not really needed --> already used by sourcing...
+if [ $#  -eq 0 ] 
+then
+   echo "Number of parameters supplied insufficient"
+   echo "Syntax : $0 queue-name input-file [chk-file]"
+   return
+fi
+
+indir=`pwd`
+queue=$2
+inputfile=$1
+workdir=/temp0/`ssh ko whoami`
+#chkfile=$3
+
+name=`echo ${inputfile%.gjf} | cut -c1-15`
+if [ "x" = "x$queue" ]; then                                              
+  queue=`~/.koscripts/qsmk2.sh | grep "Free" | awk '{print $2;}'`
+  echo $queue                                                             
+fi                                                                        
+
+#check input on presence of %chk
+chkold=""
+if grep -Fq "%oldchk=" $inputfile; then
+if ! grep -Fq "%oldchk=/" $inputfile; then
+  chkold_prep=`grep "%oldchk=" $inputfile | cut -c9-`
+  chkold="$(echo -e "${chkold_prep}" | sed -e 's/[[:space:]]*$//')"
+  if [[ $chkold != *".chk" ]]; then
+    chkold="${chkold}.chk"
+  fi
+else
+chkold=`grep "%oldchk=" $inputfile | cut -c9-`
+fi
+fi
+
+chknew=""
+if grep -Fq "%chk=" $inputfile; then
+if ! grep -Fq "%chk=/" $inputfile; then
+  chknew_prep=`grep "%chk=" $inputfile | cut -c6-`
+  chknew="$(echo -e "${chknew_prep}" | sed -e 's/[[:space:]]*$//')"
+  if [[ $chknew != *".chk" ]]; then
+    chknew="${chknew}.chk"
+  fi
+else
+chknew=`grep "%chk=" $inputfile | cut -c6-`
+fi
+fi
+#check input on presence of .cube
+if grep -q "\.cube" $inputfile; then
+  cubcub=`grep "\.cube" $inputfile`
+fi
+# set version
+
+#VERSION=${0#*subg16}
+#if [ x$VERSION = x ]
+#then
+VERSION="A03"
+#fi
+
+#Check the input file
+ssh ko "/usr/local/scripts/check_gaussian_input $inputfile $queue $workdir"
+if [ $? -ne  0 ]; then
+return; fi
+
+GAUSS_SCRDIR=$workdir
+cat <<END >$inputfile.job
+#!/bin/ksh
+if [ ! -d $GAUSS_SCRDIR ]
+then
+mkdir -p $GAUSS_SCRDIR
+fi
+cd $GAUSS_SCRDIR
+GAUSS_SCRDIR=$GAUSS_SCRDIR
+export GAUSS_SCRDIR 
+export g16root=/usr/local/chem/g16$VERSION
+. \$g16root/bsd/g16.profile
+touch $indir/${inputfile%.gjf}.log
+rm -f $GAUSS_SCRDIR/*.rwf
+END
+
+if [ "x" != "x$chkold" ]; then
+    echo "cp $indir/$chkold ." >> $inputfile.job; fi
+
+cat <<END >> $inputfile.job
+/usr/local/scripts/edit_for_nproc $indir/$inputfile > $workdir/$inputfile
+tr -d '\r' < $inputfile > $inputfile.tmp
+mv $inputfile.tmp $inputfile
+g16_FrontEnd $inputfile $indir/${inputfile%.gjf}.log
+rm -f $GAUSS_SCRDIR/Gau-*
+rm -f $GAUSS_SCRDIR/*.rwf
+END
+
+if [ "x" != "x$chkold" ]; then
+    echo "rsync -au $chkold $indir" >> $inputfile.job; fi
+if [ "x" != "x$chknew" ]; then
+    echo "rsync -au $chknew $indir" >> $inputfile.job; fi
+if [ "x" != "x$cubcub" ]; then
+    echo "cp $cubcub $indir" >> $inputfile.job; fi
+
+ssh ko "qsub -q $queue -e $indir/${inputfile}-batch.log -j eo $inputfile.job -N $name"

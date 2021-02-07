@@ -1,0 +1,19 @@
+# dirac -ko- specific --> Made for use with sshfs
+
+#alias fchk='echo "use full filenames"; ssh t1 -t ssh ko -t ssh node3 -- /usr/local/chem/g16A03/formchk'
+alias fchk='~/.koscripts/fchk.sh'
+alias qsm='ssh ko -- qsum -u | grep -A10 'free' | tail -n 11'
+alias qsp='ssh ko -- qsum -u | grep -A10 'free' | head -n 11'
+alias qst='ssh ko -- qstat -u koen | tail -n +4'
+alias wqst='watch "ssh t1 -t ssh ko -- qstat -u koen"'
+alias qsmk='~/.koscripts/qsmk.sh'
+alias qsmk2='~/.koscripts/qsmk2.sh'
+alias delba='bash ~/.koscripts/delba.sh'
+#alias s2='. ~/.koscripts/s2'
+#alias dal='. ~/sftp/ko/.scrpts/.dal.sh'
+alias out.o='. ~/.koscripts/out.o.sh'
+alias out.x='. ~/.koscripts/out.x.sh'
+#alias parammp='. ~/.mmpscripts/parammp.sh'
+#alias prexx10='. ~/.mmpscripts/prexx10.sh'
+#alias genspec=~/sftp/ko/.mmpscripts/genspec.py
+
