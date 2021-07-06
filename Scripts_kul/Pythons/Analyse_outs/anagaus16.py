@@ -11,41 +11,47 @@ import csv
 
 def init():
     parser = ArgumentParser()
-    parser.add_argument("dirname", help="Give name of directory with Gaussian output files")
+    parser.add_argument("dirname", nargs='+', help="Give name of directory with Gaussian output files")
     parser.add_argument("-v", help="Output to stdout, no csv-output, unless -o or -w specified", action="store_true")
     parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
     parser.add_argument("-o", "--outfile", help="Give name of csv-file")
-    # todo add options for: split name; fc/es/gs force; ...
+    parser.add_argument("-f", "--force", help="Force analysis of  vertical transition (vt, fc).", action="store_true")
     args = parser.parse_args()
     fileflag = None
-    if args.dirname[0] in ('/', '~'):
-        dirname = args.dirname
-    else:
-        dirname = os.getcwd() + '/' + args.dirname
-    if dirname[-1] != '/':
-        if os.path.isfile(dirname):
-            fileflag = os.path.basename(dirname)
-            dirname = os.path.dirname(dirname) + '/'
-        else:
-            dirname = dirname + '/'
     if args.outfile:
         if re.search("[.]csv$", args.outfile):
-            csvname = str("".join(args.outfile.split('.')[:-1]))
+            csvname = os.getcwd() + str("".join(args.outfile.split('.')[:-1]))
         else:
-            csvname = str(args.outfile)
+            csvname = os.getcwd() + str(args.outfile)
     else:
-        csvname = 'results'
-    main(dirname, outname=csvname, onefile=fileflag)
+        csvname = os.getcwd() + '/results.csv'
+
+    for dirdir in args.dirname:
+        print(dirdir)
+        if dirdir[0] in ('/', '~'):
+            dirname = dirdir
+        else:
+            dirname = os.getcwd() + '/' + dirdir
+        if dirname[-1] != '/':
+            if os.path.isfile(dirname):
+                fileflag = os.path.basename(dirname)
+                dirname = os.path.dirname(dirname) + '/'
+            else:
+                dirname = dirname + '/'
+        main(dirname, outname=csvname, onefile=fileflag, fc=args.force)
+
     if args.v:
-        with open(dirname + csvname + '.csv', 'r') as csvfile:
+        with open(csvname, 'r') as csvfile:
             [print(line.rstrip()) for line in csvfile.readlines()]
         if not args.w and not args.outfile:
-            os.remove(dirname + csvname + '.csv')
+            os.remove(csvname)
 
 
-def main(alldir, outname='results', onefile=None):
+def main(alldir, outname=None, onefile=None, fc=False):
     files_all = os.listdir(alldir)
     files_all.sort()
+    if outname is None:
+        outname = alldir + 'results.csv'
     if onefile is not None:
         files_all = [onefile]
 
@@ -94,11 +100,11 @@ def main(alldir, outname='results', onefile=None):
             [rowk.append(k) for k in esp[k]['ifcoefs']]
             outfile.writerow(rowk)
 
-    with open(alldir + outname + '.csv', 'w') as f:
+    with open(outname, 'a') as f:
         csvw = csv.writer(f)
-        csvw.writerow(['name', 'o/f', 'time', 'imag', 'gse/ese', 'zpe', 'esopt', 'emmE-eV', 'f', 'ifcoefs'])
+        csvw.writerow(['name', 'o/f', 'time', 'imag', 'gse/ese', 'zpe', 'esopt', 'emmE-eV', 'f', 'ifweights'])
         for allvar in files_all:
-            if re.search("[Ff][Cc].*[.]log", allvar):
+            if fc or re.search("[Ff][Cc].*[.]log", allvar):
                 logFCout(alldir + allvar, csvw)
             elif re.search("[.]log", allvar):
                 log1out(alldir + allvar, csvw)
@@ -110,7 +116,8 @@ def dhms2time(d, h, m, s):
 
 def start_ana(totfile):
     # Todo imag=None vs =0 --> difference in 0 and not finished (probably already possible with flags)
-    # possibly imag=0 if of=True and el=2
+    # possibly imag=0 if of=True and el=2 --> not if only freq calc...
+    # TODO: split of-flag into o and f (such that no error is given if only opt-calc)
     filedic = {'gsprops': None, 'esprops': None, 'genprops': {'time': 0, 'o/f': '', 'imag': None}}
     with open(totfile, "r") as fl:
         of_flag = False
@@ -129,6 +136,7 @@ def start_ana(totfile):
             if re.search('^ (Grad){18}$', line) and not of_flag:
                 of_flag = True
             if of_flag:
+                # proceeding to job number 2...
                 if re.search('Optimization completed[.]', line):
                     oc_flag = oc_flag + 1
                 imag_match = re.search(r"[*]{6} +([0-9]+) imaginary frequencies \(negative Signs\) [*]{6}", line)
@@ -137,7 +145,7 @@ def start_ana(totfile):
                     filedic['genprops']['imag'] = imag_num
             if re.search('Elapsed', line):
                 el_time.append(dhms2time(line.split()[2], line.split()[4], line.split()[6], line.split()[8]))
-                filedic['genprops']['time'] = sum(el_time)
+                filedic['genprops']['time'] = round(sum(el_time), 1)
                 el_flag = el_flag + 1
             if re.search('This state for optimization and[/]or second-order correction[.]', line):
                 es_flag = True
@@ -189,11 +197,11 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
     with open(totfile, "r") as fl:
         ifs_flag = False
         for i, line in enumerate(fl):
-            if i < linenums[0] - 1:
-                continue
             if of:
                 zpe_corr, ese_sum, scfdone = sezpe(line, [zpe_corr, ese_sum, scfdone])
-            # tde_match = re.search(r"^ Total Energy, E\(TD-HF/TD-DFT\) = +([0-9.-]+)", line)
+            if i < linenums[0] - 1:
+                continue  # before linenum, the ESenergies are not yet converged. (Not really necessary, but extra
+                # control and maybe faster?) SCFDone occurs before this point, so is overwritten each time.
             tde_match = re.search(r"^ Total Energy, E\(.+\) = +([0-9.-]+)", line)
             if tde_match is not None:
                 tde = float(tde_match.group(1))
@@ -202,23 +210,31 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
             if ifs_flag:
                 ifcoef_match = re.search(r" +([0-9]{1,3}) (->|<-) ?([0-9]{1,3}) +([0-9.-]+)", line)
                 if ifcoef_match is not None:
-                    # print(ifcoef_match.group(1, 3, 4))
-                    ifcoefslist = [int(ifcoef_match.group(1)), int(ifcoef_match.group(3)), float(ifcoef_match.group(4))]
-                    [ifs_mat.append(k) for k in ifcoefslist]
+                    weight = round(float(ifcoef_match.group(4)) ** 2 * 2, 2)
+                    ifcoefslist = [int(ifcoef_match.group(1)), int(ifcoef_match.group(3)), weight]
+                    # ifcoefslist = [int(ifcoef_match.group(1)), int(ifcoef_match.group(3)), float(ifcoef_match.group(4))]
+                    # [ifs_mat.append(k) for k in ifcoefslist]
+                    ifs_mat.append(ifcoefslist)
                 else:
-                    esdict[es_num]['ifcoefs'] = ifs_mat
+                    ifs_mat.sort(key=lambda x: x[2], reverse=True)
+                    ifs_mat2 = []
+                    [[ifs_mat2.append(k) for k in l] for l in ifs_mat]
+                    esdict[es_num]['ifcoefs'] = ifs_mat2
                     ifs_flag = False
             if es_match is not None:
                 es_num = int(es_match.group(1))
                 esdict[es_num]['emmE-eV'] = float(es_match.group(3))
                 esdict[es_num]['emmE-nm'] = float(es_match.group(4))
-                esdict[es_num]['f'] = float(es_match.group(5))
+                if re.search(r"Triplet", es_match.group(2)):
+                    esdict[es_num]['f'] = -3
+                else:
+                    esdict[es_num]['f'] = float(es_match.group(5))
                 esdict[es_num]['s^2'] = float(es_match.group(6))
                 ifs_flag = True
                 ifs_mat = []
 
     ediff1 = round(float(tde + zpe_corr - ese_sum), 4)
-    ediff2 = round(float(scfdone + esdict[es_num]['emmE-eV']/27.212 - tde))
+    ediff2 = round(float(scfdone + esdict[es_num]['emmE-eV'] / 27.212 - tde))
     if ediff1 != 0 or ediff2 != 0:
         if of:
             print('huh? calc not finished?\n   --> Ediff = %f\n   --> Ediff2 = %f' % (ediff1, ediff2))

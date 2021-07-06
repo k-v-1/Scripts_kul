@@ -82,10 +82,10 @@ nnoremap <Right> :echoe "Use l"<CR>
 nnoremap <Up>    :echoe "Use k"<CR>
 nnoremap <Down>  :echoe "Use j"<CR>
 " ...and in insert mode
-inoremap <Left>  <ESC>:echoe "Use h"<CR>
-inoremap <Right> <ESC>:echoe "Use l"<CR>
-inoremap <Up>    <ESC>:echoe "Use k"<CR>
-inoremap <Down>  <ESC>:echoe "Use j"<CR>
+"inoremap <Left>  <ESC>:echoe "Use h"<CR>
+"inoremap <Right> <ESC>:echoe "Use l"<CR>
+"inoremap <Up>    <ESC>:echoe "Use k"<CR>
+"inoremap <Down>  <ESC>:echoe "Use j"<CR>
 
 " map (shift-) tab in visual mode (and insert mode?) to get tabs
 vnoremap <Tab> <S->>gv
@@ -100,11 +100,11 @@ set timeoutlen=1000 ttimeoutlen=0
 
 "FOLDING #test
 set foldenable          " enable folding
-set foldlevelstart=10   " open most folds by default
+set foldlevelstart=0   " open most folds by default
 set foldnestmax=10      " 10 nested fold max
 " space open/closes folds
 " nnoremap <space> za
-set foldmethod=indent   " fold based on indent level
+set foldmethod=manual   " fold based on indent level
 " This is especially useful for me since I spend my days in Python.
 " Other acceptable values are marker, manual, expr, syntax, diff.
 " Run :help foldmethod to find out what each of those do.

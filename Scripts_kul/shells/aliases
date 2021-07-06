@@ -2,24 +2,32 @@ export SCRPTS=/home/u0133458/PycharmProjects/Scripts_kul
 alias ls='ls --color=auto'
 alias ll='ls -lh'
 alias la='ls -A'
+alias llog='ls *.log'
 alias vo='vi -O'
 alias lt='ls -lrt | tail'
 alias ccc='cd ~/Documents/Calc'
-#alias cs='. ~/.cs'
 alias cs=". $SCRPTS/shells/cs"
-alias gabedit=~/GabeditSrc250/gabedit
+#alias gabedit=~/GabeditSrc250/gabedit
 alias pip=pip3
+alias remember='xdg-open ~/Documents/Calc/CodeToRemember.txt'
 
 alias rsyng='rsync -auv --exclude="*.chk" --exclude="*.fchk"'
 alias rsynh='rsync -auvOh --exclude="*.chk" --progress'
 alias ct1='sshfs t1:/user/leuven/331/vsc33143 ~/sftp/t1/home;sshfs t1:/data/leuven/331/vsc33143 ~/sftp/t1/data; cs ~/sftp/t1/home'
 alias ct2='sshfs t2:/user/leuven/331/vsc33143 ~/sftp/t2/home;sshfs t2:/data/leuven/331/vsc33143 ~/sftp/t2/data; cs ~/sftp/t2/home'
-alias cko="sshfs : ~/sftp/ko -o ssh_command='ssh t1 -t ssh ko'; source ~/.koscripts/ko_aliases; cs ~/sftp/ko"
+alias cko="sshfs : ~/sftp/ko -o ssh_command='ssh t1 -t ssh ko'; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"
+alias cko0="sshfs : ~/sftp/ko -o ssh_command='ssh t1 -t ssh ko'; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls; tmux split-window -h 'ssh t1 -t ssh ko'"
+alias cko1="sshfs ko: ~/sftp/ko; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"
 alias alko="source ~/.koscripts/ko_aliases"
 
 alias anagaus='python3 $SCRPTS/Pythons/Analyse_outs/anagaus16.py'
-alias i2j='python3 $SCRPTS/Pythons/inscripts/coordscripts.py'
+alias fmspec='python3 $SCRPTS/Pythons/Analyse_outs/fcc-mmp_spec.py'
+alias i2j='python3 $SCRPTS/Pythons/Inscripts/coordscripts.py'
 alias avo=$SCRPTS/shells/avo.sh
+alias anaclr=$SCRPTS/shells/clr.sh
+alias fcc=~/.fcclasses/main/fcclasses3
+
+#alias dushin=/usr/local/dushin-2020/dushin.exe
 
 #alias wqstko="watch 'ssh ko qstat -u koen'"
 #alias anagaus='python3 /home/u0133458/Documents/PycharmProjects/fps/anagaus_on_demand.py'

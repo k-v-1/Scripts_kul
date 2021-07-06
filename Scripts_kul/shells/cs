@@ -1,19 +1,21 @@
 if [ -n "$ZSH_VERSION" ]; then
-if [ $#  -ne 1 ]
-then
-cd ; ls 
-return
+if [ $#  -eq 0 ]; then
+    cd ; ls 
+    return
 fi
-if [ ! -d $1 -a $1 != "-" ]
-then
-while true; do
-    read "yn?Make Dir? [y/n] "
-    case $yn in
-        [Yy]* ) mkdir $1; break;;
-        [Nn]* ) return; break;;
-        * ) echo "Please answer yes or no.";;
-    esac
-done
+if [ ! -d $1 -a $1 != "-" ]; then
+    if [ -f $1 ]; then
+        vi $1
+        return
+    fi
+    while true; do
+        read "yn?Make Dir? [y/n] "
+        case $yn in
+            [Yy]* ) mkdir $1; break;;
+            [Nn]* ) return; break;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
 fi
 cd $1
 ls $2

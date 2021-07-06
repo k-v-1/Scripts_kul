@@ -3,6 +3,7 @@ import numpy as np
 import os
 import argparse
 import json
+import re
 
 atnum2sym = {1: 'H',
              2: 'He',
@@ -68,6 +69,7 @@ def init():
     man = '''Additional information:
     l2g file --> from gaussian xx.log, makes xx.gaus file with gaussian coordinates
     l2x file --> from gaussian xx.log, makes xx.xyz file
+    o2x file --> from qchem xx.out, makes xx.xyz file
     l2d file -b BASINFO --> from gaussian xx.log, makes xx.dal inputfile
                             possibility to extract bs from log ##might not aways work in dalton##
     x2d file -b BASINFO --> from xx.xyz, makes xx.dal inputfile
@@ -77,6 +79,8 @@ def init():
                                      epilog=man)
     parser.add_argument("i2j", type=str, help="choose conversion: l2g; l2x; l2d; x2d")
     parser.add_argument("filename", help="add filename")
+    parser.add_argument("-t", "--header", action="store_true",
+                        help="adds the total number of atoms + title as 2-line-header of xyz-file")
     parser.add_argument("-b", "--basinfo", help="add optional basisset information for [l,x]2d")
     args = parser.parse_args()
     if args.filename[0] in ('/', '~'):
@@ -86,7 +90,9 @@ def init():
     if args.i2j == 'l2g':
         log2gaus(filename)
     elif args.i2j == 'l2x':
-        log2xyz(filename)
+        log2xyz(filename, header=args.header)
+    elif args.i2j == 'o2x':
+        qout2xyz(filename, header=args.header)
     elif args.i2j == 'l2d':
         if args.basinfo:
             log2dal(filename, **json.loads(args.basinfo))
@@ -101,44 +107,84 @@ def init():
         print('error')
 
 
-def get_nats(filename):
-    script = """
-            cat %s | grep "%s" | head -n %d
-            """ % (filename, 'NAtoms=', 1)
-    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
-    t = [i.decode('utf8').split() for i in p.stdout.readlines()]
-    return int(t[0][1])  # returns number of atoms
+# returns number of atoms from gaussian or qchem output
+def get_nats(filename, prog='gaus'):
+    if re.search('gaus', prog, re.IGNORECASE):
+        script = """
+                grep -a "NAtoms=" %s | head -n1 | awk '{print $2}'
+                """ % filename
+        search_str = "Coordinates \(Angstroms\)"
+    elif re.search('qchem', prog, re.IGNORECASE):
+        script = """
+                grep -a -A1 "NAtoms" %s | tail -n1 | awk '{print $1}'
+                """ % filename
+        search_str = "Standard Nuclear Orientation \(Angstroms\)"
+    else:
+        return 0
+    try:
+        p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
+        return int(p.stdout.readline().decode('utf8'))
+    except ValueError:
+        with open(filename, "r") as fin:
+            count_flag = False
+            coord_flag = False
+            count = 0
+            for line in fin.readlines():
+                if re.search(search_str, line):
+                    count_flag = True
+                if count_flag:
+                    if not coord_flag and re.search("------------------------------------", line):
+                        coord_flag = True
+                    elif coord_flag:
+                        if re.search("--------------------------------------", line):
+                            break
+                        else:
+                            count = count + 1
+        return count
 
 
 def getgbas(filename):
     script = """
-                grep "Standard basis:" %s | head -n1
+                grep -a "Standard basis:" %s | head -n1
                 """ % filename
     p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
     t = [i.decode('utf8').split() for i in p.stdout.readlines()]
     return t[0][2]  # returns basis set
 
 
-def grepcoord(filename):
-    nats = get_nats(filename)
-    script = """
-                grep -A%d "%s" %s | tail -n%d
-                """ % (nats + 5, 'Standard orientation', filename, nats + 6)
+# gets coordinates from log-file or out-file (qchem)
+# used for log2xyz->xyz2dal, qout2xyz and log2gaus (+ext. coorddiff.py)
+def grepcoord(filename, prog='gaus'):
+    nats = get_nats(filename, prog=prog)
+    if re.search('gaus', prog, re.IGNORECASE):
+        script = """
+        grep -a -A%d "%s" %s | tail -n%d
+        """ % (nats + 4, 'Standard orientation', filename, nats)
+    elif re.search('qchem', prog, re.IGNORECASE):
+        script = """
+        grep -a -A%d "%s" %s | tail -n%d
+        """ % (nats + 2, 'Standard Nuclear Orientation (Angstroms)', filename, nats)
+    else:
+        return 0
     p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
     t = [[i.decode('utf8').split() for i in p.stdout.readlines()]]
     return t[0]
 
 
 # makes xyz from log; replaces .log with .xyz
-def log2xyz(file):
+def log2xyz(file, header=False):
+    gn = grepcoord(file)
+    fn = np.array([tuple(x) for x in gn],
+                  dtype=[('c1', int), ('c2', int), ('c3', int), ('c4', float), ('c5', float), ('c6', float)])
+    fn = (np.sort(fn, axis=0, order='c2'))[::-1]
+
     outmap = os.path.dirname(file) + '/'
     infile = file.split('/')[-1]
     outfile = infile.replace('.log', '.xyz')
     with open(outmap + outfile, "w") as wr:
-        gn = grepcoord(file)[5:-1]
-        fn = np.array([tuple(x) for x in gn],
-                      dtype=[('c1', int), ('c2', int), ('c3', int), ('c4', float), ('c5', float), ('c6', float)])
-        fn = (np.sort(fn, axis=0, order='c2'))[::-1]
+        if header:
+            wr.write(str(get_nats(file, prog='gaus')))
+            wr.write(file)
         for i in range(len(fn)):
             f1 = '%.10f' % fn[i][3]
             f2 = '%.10f' % fn[i][4]
@@ -151,14 +197,47 @@ def log2xyz(file):
     return outmap + outfile
 
 
+# makes xyz from output of Qchem
+def qout2xyz(file, header=False, write=True):
+    gn = grepcoord(file, 'qchem')
+    for i in range(len(gn)):
+        gn[i][1] = sym2atnum[gn[i][1]]  # Convert symbols to number, so order is correct.
+    fn = np.array([tuple(x) for x in gn],
+                  dtype=[('c1', int), ('c2', int), ('c3', float), ('c4', float), ('c5', float)])
+    fn = (np.sort(fn, axis=0, order='c2'))[::-1]
+    if not write:
+        coord_array = []
+        for i in range(len(fn)):
+            coord_array.append([atnum2sym[fn[i][1]], fn[i][2], fn[i][3], fn[i][4]])
+        return coord_array
+    outmap = os.path.dirname(file) + '/'
+    infile = file.split('/')[-1]
+    outfile = infile.replace('.out', '.xyz')
+    with open(outmap + outfile, "w") as wr:
+        if header:
+            wr.write(str(get_nats(file, prog='qchem')))
+            wr.write(file)
+        for i in range(len(fn)):
+            f1 = '%.10f' % fn[i][2]
+            f2 = '%.10f' % fn[i][3]
+            f3 = '%.10f' % fn[i][4]
+            s1 = atnum2sym[fn[i][1]]
+            s2 = ' ' * (8 - len(s1)) + str(' ' if '-' not in f1 else '')
+            s3 = ' ' * 5 + str(' ' if '-' not in f2 else '')
+            s4 = ' ' * 5 + str(' ' if '-' not in f3 else '')
+            wr.write(s1 + s2 + f1 + s3 + f2 + s4 + f3 + '\n')
+    return outmap + outfile
+
+
 # makes gjfcoords from log; replaces .log with .gaus
+# main difference with log2xyz is conservation of atom-order
 def log2gaus(file):
+    gn = grepcoord(file)
     outmap = os.path.dirname(file) + '/'
     infile = file.split('/')[-1]
     outfile = infile.replace('.log', '.gaus')
     with open(outmap + outfile, "w") as wr:
-        gn = grepcoord(file)
-        for i in range(5, len(gn) - 1):
+        for i in range(len(gn)):
             symb = atnum2sym[int(gn[i][1])]
             wr.write(symb + (4 - len(symb)) * ' '
                      + (14 - len(gn[i][3])) * ' ' + gn[i][3]
@@ -259,7 +338,6 @@ def log2dal(file, **basinfo):
 
 if __name__ == '__main__':
     init()
-
 
 # from collections import namedtuple
 # def creatingsym2atnum():
