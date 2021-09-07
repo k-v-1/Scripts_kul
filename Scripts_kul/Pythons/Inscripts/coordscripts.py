@@ -61,7 +61,8 @@ atnum2sym = {1: 'H',
              54: 'Xe',
              55: 'Cs',
              56: 'Ba',
-             57: 'La'}
+             57: 'La',
+             78: 'Pt'}
 sym2atnum = {v: k for k, v in atnum2sym.items()}
 
 
