@@ -188,9 +188,9 @@ END
         if datdic['isgauss'] == '.f.':
             datdic['BroadenType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', '-', '-'
         if re.search('LOR', datdic['BroadenType']):  # more exact fwhm
-            datdic['FWHM'] = datdic['brexp']
+            datdic['FWHM'] = datdic['brexp']*2
         elif re.search('GAU', datdic['BroadenType']):
-            datdic['FWHM'] = math.sqrt(
+            datdic['FWHM'] = 2* math.sqrt(
                 2 * datdic['brexp'] / (math.sqrt(2 * math.log10(2))))  # todo: test this expression
 
         prntln = '%s, %0.2e, %0.2e, %d, %0.3f, %0.0f, %0.3f, %0.0f, %s, %0.2e, %s, %d, %0.2e' % (
