@@ -1,62 +1,69 @@
 from argparse import ArgumentParser
-import os
 import re
 import csv
-
+from pathlib import Path
 
 # import numpy as np
 # from collections import defaultdict
-# from pathlib import Path
 
 
 def init():
     parser = ArgumentParser()
-    parser.add_argument("dirname", nargs='+', help="Give name of directory with Gaussian output files")
+    parser.add_argument("dirname", nargs='+', help="Give list of folders and/or files for analysis")
     parser.add_argument("-v", help="Output to stdout, no csv-output, unless -o or -w specified", action="store_true")
     parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
     parser.add_argument("-o", "--outfile", help="Give name of csv-file")
     parser.add_argument("-f", "--force", help="Force analysis of  vertical transition (vt, fc).", action="store_true")
     args = parser.parse_args()
-    fileflag = None
     if args.outfile:
-        if re.search("[.]csv$", args.outfile):
-            csvname = os.getcwd() + str("".join(args.outfile.split('.')[:-1]))
-        else:
-            csvname = os.getcwd() + str(args.outfile)
+        csvname = Path(args.outfile).expanduser().absolute()
     else:
-        csvname = os.getcwd() + '/results.csv'
-
-    for dirdir in args.dirname:
-        print(dirdir)
-        if dirdir[0] in ('/', '~'):
-            dirname = dirdir
+        csvname = Path.cwd().joinpath('results.csv').expanduser().absolute()
+    if csvname.is_file():
+        yn = input("file already exist, overwrite? [y/n] ")
+        if 'y' in yn:
+            csvname.unlink()
         else:
-            dirname = os.getcwd() + '/' + dirdir
-        if dirname[-1] != '/':
-            if os.path.isfile(dirname):
-                fileflag = os.path.basename(dirname)
-                dirname = os.path.dirname(dirname) + '/'
-            else:
-                dirname = dirname + '/'
-        main(dirname, outname=csvname, onefile=fileflag, fc=args.force)
+            exit(0)
 
-    if args.v:
-        with open(csvname, 'r') as csvfile:
-            [print(line.rstrip()) for line in csvfile.readlines()]
-        if not args.w and not args.outfile:
-            os.remove(csvname)
+    fls = []
+    for dirdir in args.dirname:
+        drg = Path(dirdir).expanduser().absolute()
+        if drg.is_file():
+            fls.append(drg)
+        elif drg.is_dir():
+            [fls.append(k) for k in drg.glob('./*') if k.is_file()]  # filter out all subdirs
+        else:
+            print('\"%s\" is no file or dir?' % dirdir)
+            continue
+    fls.sort()  # in or out the loop? eg do i want to keep user sequence?
+    for flname in fls:
+        with open(flname, 'r') as fl:
+            if 'Entering Gaussian System' not in fl.read():  # (faster than re.search)
+                continue
+        main(flname, outname=csvname, fc=args.force)
+
+    if csvname.is_file():
+        with open(csvname, 'r+') as csvfile:
+            content = csvfile.read()
+            csvfile.seek(0, 0)
+            csvfile.write('name, o/f, time, imag, gse/ese, zpe, esopt, emmE-eV, f, ifweights\n' + content)
+        if args.v:
+            print()
+            with open(csvname, 'r') as csvfile:
+                [print(line.rstrip()) for line in csvfile.readlines()]
+            if not args.w and not args.outfile:
+                csvname.unlink()
+    else:
+        print('no valid gaussian logfiles selected')
+        exit(1)
 
 
-def main(alldir, outname=None, onefile=None, fc=False):
-    files_all = os.listdir(alldir)
-    files_all.sort()
-    if outname is None:
-        outname = alldir + 'results.csv'
-    if onefile is not None:
-        files_all = [onefile]
+def main(filename, outname, fc=False):
+    basename = filename.name
 
     def log1out(infile, outfile):
-        name = infile.split('/')[-1].replace('.log', '')
+        name = infile.name
         print(name)  # , filedict)
         filedict = start_ana(infile)
         row1 = [name, filedict['genprops']['o/f'], filedict['genprops']['time'], filedict['genprops']['imag']]
@@ -76,7 +83,7 @@ def main(alldir, outname=None, onefile=None, fc=False):
         outfile.writerow(row1)
 
     def logFCout(infile, outfile):
-        name = infile.split('/')[-1].replace('.log', '')
+        name = infile.name
         print(name)  # , filedict)
         filedict = start_ana(infile)
         try:
@@ -102,12 +109,10 @@ def main(alldir, outname=None, onefile=None, fc=False):
 
     with open(outname, 'a') as f:
         csvw = csv.writer(f)
-        csvw.writerow(['name', 'o/f', 'time', 'imag', 'gse/ese', 'zpe', 'esopt', 'emmE-eV', 'f', 'ifweights'])
-        for allvar in files_all:
-            if fc or re.search("[Ff][Cc].*[.]log", allvar):
-                logFCout(alldir + allvar, csvw)
-            elif re.search("[.]log", allvar):
-                log1out(alldir + allvar, csvw)
+        if fc or re.search("[Ff][Cc].*[.]log", basename):
+            logFCout(filename, csvw)
+        elif re.search("[.]log", basename):
+            log1out(filename, csvw)
 
 
 def dhms2time(d, h, m, s):
