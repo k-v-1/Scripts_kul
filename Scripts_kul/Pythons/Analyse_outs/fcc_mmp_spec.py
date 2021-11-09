@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import littlescripts as lts
+from pathlib import Path
 
 uconv = {'nm': 1239.849, 'rcm': 8065.5, 'cm-1': 8065.5, 'ev': 1, 'au': 0.0367}
 colconv = {'nm': 3, 'rcm': 2, 'cm-1': 2, 'ev': 1, 'au': 0}
@@ -22,48 +23,47 @@ def init():
     parser.add_argument('-l', '--logkic', action='store_true', help='plot log(kic) instead of kic')
     parser.add_argument('-u', '--unit', type=str.lower, help='eV, nm, rcm=cm-1', default='ev')
     parser.add_argument('-a', '--axis', type=float, nargs=2, help='specify x-axis values', default=None)
+    parser.add_argument('-f', '--onefig', action='store_true', help='plot all spectra in one figure')
     args = parser.parse_args()
     for folder in args.folders:
-        if folder[0] in ('/', '~'):
-            dirgen = folder
-        else:
-            dirgen = os.getcwd() + '/' + folder
-        if dirgen[-1] != '/':
-            dirgen += '/'
+        dirgen = Path(folder).expanduser().absolute()
 
-        dirabs = dirgen + 'abs/'
-        diremi = dirgen + 'emi/'
-        dirkic = dirgen + 'kic/'
-        dirkr = dirgen + 'kr/'
+        for meth in ['TD', 'TI']:
+            if not args.nospec:
+                filabs = dirgen/'abs' / f'spec_Int_{meth}.dat'
+                filemi = dirgen/'emi' / f'spec_Int_{meth}.dat'
+                filkr = dirgen/'kr' / 'spec.tvcf.spec.dat'
+                if filabs.is_file():
+                    genspec_fcc(filabs, filemi, unit=args.unit, axval=args.axis, onefig=args.onefig)
+                    break
+                elif filkr.is_file():
+                    genspec_mmp(filkr, unit=args.unit, axval=args.axis, onefig=args.onefig)
+                    break
+                else:
+                    print(f'no spectra in folder ({meth})')
+        for meth in ['TD', 'TI']:
+            if not args.nokic:
+                filkic = dirgen/'kic' / f'kic_vs_Ead_{meth}.dat'
+                filkic2 = dirgen/'kic' / 'ic.tvcf.fo.dat'
+                if filkic.is_file():
+                    genkicspec(filkic, p1='fcc', unit=args.unit, axval=args.axis, klog=args.logkic, onefig=args.onefig)
+                    break
+                elif filkic2.is_file():
+                    genkicspec(filkic, p1='mmp', unit=args.unit, axval=args.axis, klog=args.logkic, onefig=args.onefig)
+                    break
+                else:
+                    print(f'no ic-file found ({meth})')
 
-        if not args.nospec:
-            try:
-                filabs = dirabs + 'spec_Int_TD.dat'
-                filemi = diremi + 'spec_Int_TD.dat'
-                genspec_temp(filabs, filemi, unit=args.unit, axval=args.axis)
-            except OSError or FileNotFoundError:
-                try:
-                    filkr = dirkr + 'spec.tvcf.spec.dat'
-                    genspec_mmp(filkr, unit=args.unit, axval=args.axis)
-                except OSError or FileNotFoundError:
-                    plt.close()
-                    print('no spectra in folder')
-        if not args.nokic:
-            try:
-                filkic = dirkic + 'kic_vs_Ead_TD.dat'
-                genkicspec(filkic, p1='fcc', unit=args.unit, axval=args.axis, klog=args.logkic)
-            except (OSError, FileNotFoundError):
-                try:
-                    filkic = dirkic + 'ic.tvcf.fo.dat'
-                    genkicspec(filkic, p1='mmp', unit=args.unit, axval=args.axis, klog=args.logkic)
-                except (OSError or FileNotFoundError):
-                    plt.close()
-                    print('no ic-file found')
+    plt.legend()
     plt.show()
 
 
-def genkicspec(filkic, p1, unit='ev', axval=None, klog=False, ead_kic=None):
-    plt.figure(filkic.split('/')[-3] + ' - ic', figsize=(4, 3))
+def genkicspec(filkic, p1, unit='ev', axval=None, klog=False, ead_kic=None, onefig=False):
+    label = str(filkic).split('/')[-3]
+    if onefig:
+        plt.figure(2, figsize=(4, 3))
+    else:
+        plt.figure(label + ' - ic', figsize=(4, 3))
     matkic = np.genfromtxt(filkic, delimiter="")
     if p1 == 'fcc':
         xvals, yvals = matkic[:, 0] * uconv[unit], matkic[:, 1]
@@ -80,8 +80,11 @@ def genkicspec(filkic, p1, unit='ev', axval=None, klog=False, ead_kic=None):
     if klog:  # returns log(kic), except if kic is < 1 (negative), then 0
         yvals = np.array([math.log10(abs(max(1, i))) for i in yvals])
         y_smo = np.array([math.log10(abs(max(1, i))) for i in y_smo])
-    plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, color='k')  # kic
-    plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
+    if onefig:
+        plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, label=label)  # kic
+    else:
+        plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, color='k')  # kic
+        plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
     if ead_kic is not None:  # Todo, not used yet
         for i in range(0, len(ead_kic), 2):
             plt.plot(ead_kic[i], ead_kic[i + 1], ['X', 'x'][i // 2 % 2], color='k')
@@ -92,8 +95,12 @@ def genkicspec(filkic, p1, unit='ev', axval=None, klog=False, ead_kic=None):
     # plt.savefig('/home/koen/un2/mmp/tmp.png')
 
 
-def genspec_temp(filabs, filemi, unit='ev', axval=None):
-    plt.figure(filabs.split('/')[-3], figsize=(4, 3))
+def genspec_fcc(filabs, filemi, unit='ev', axval=None, onefig=False):
+    label = str(filabs).split('/')[-3]
+    if onefig:
+        plt.figure(1, figsize=(4, 3))
+    else:
+        plt.figure(label, figsize=(4, 3))
     matabs = np.genfromtxt(filabs, delimiter="")
     matabs[:, 1] *= 1 / max(matabs[:, 1])
     matemi = np.genfromtxt(filemi, delimiter="")
@@ -108,22 +115,36 @@ def genspec_temp(filabs, filemi, unit='ev', axval=None):
         plt.axis([axval[0], axval[1], 0, 1])
     matabs[:, 0] *= k
     matemi[:, 0] *= k
-    plt.plot(matabs[:, 0], matabs[:, 1], linewidth=lnsz, alpha=0.8, color='blue')  # abs
-    plt.plot(matemi[:, 0], matemi[:, 1], linewidth=lnsz, alpha=0.8, color='green')  # emi
+    if onefig:
+        plt.plot(matabs[:, 0], matabs[:, 1], linewidth=lnsz, alpha=0.8, label=label)  # abs
+        col = plt.gca().lines[-1].get_color()
+        plt.plot(matemi[:, 0], matemi[:, 1], linewidth=lnsz, alpha=0.8, label=label, linestyle='-.', color=col)  # emi
+    else:
+        plt.plot(matabs[:, 0], matabs[:, 1], linewidth=lnsz, alpha=0.8, color='blue')  # abs
+        plt.plot(matemi[:, 0], matemi[:, 1], linewidth=lnsz, alpha=0.8, color='green')  # emi
     plt.xlabel(unit, fontsize=fntsz)
     plt.ylabel('Intensity', fontsize=fntsz)
     plt.tight_layout()
     # plt.savefig('/home/koen/un2/mmp/tmp.png')
 
 
-def genspec_mmp(filename, unit='ev', axval=None):
-    plt.figure(filename.split('/')[-3], figsize=(4, 3))
+def genspec_mmp(filename, unit='ev', axval=None, onefig=False):
+    label = str(filename).split('/')[-3]
+    if onefig:
+        plt.figure(1, figsize=(4, 3))
+    else:
+        plt.figure(label, figsize=(4, 3))
     if axval is not None:
         plt.axis([axval[0], axval[1], 0, 1])
     rspmat = np.genfromtxt(filename, delimiter="")
     k = colconv[unit]
-    plt.plot(rspmat[:, k], rspmat[:, 4], linewidth=lnsz, alpha=0.8, color='blue')  # abs
-    plt.plot(rspmat[:, k], rspmat[:, 5], linewidth=lnsz, alpha=0.8, color='green')  # emi
+    if onefig:
+        plt.plot(rspmat[:, k], rspmat[:, 4], linewidth=lnsz, alpha=0.8, label=label)  # abs
+        col = plt.gca().lines[-1].get_color()
+        plt.plot(rspmat[:, k], rspmat[:, 5], linewidth=lnsz, alpha=0.8, label=label, linestyle='-.', color=col)  # emi
+    else:
+        plt.plot(rspmat[:, k], rspmat[:, 4], linewidth=lnsz, alpha=0.8, color='blue')  # abs
+        plt.plot(rspmat[:, k], rspmat[:, 5], linewidth=lnsz, alpha=0.8, color='green')  # emi
     # plt.plot(rspmat[:, k], rspmat[:, 6], linewidth=1.5, alpha=0.5, color='black')
     plt.xlabel(unit, fontsize=fntsz)
     plt.ylabel('Intensity', fontsize=fntsz)
