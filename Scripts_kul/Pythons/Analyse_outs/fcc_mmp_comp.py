@@ -445,8 +445,8 @@ def dus_main(d1, d2, p1='mmp', p2='fcc'):
 
 
 if __name__ == '__main__':
-    # init()
+    init()
     # TEST
-    tstdir = Path('/home/u0133458/sftp/ko/un3/ic2/brt') / 'l0.0001_ti_int'
-    inf_main(tstdir, p1='fcc',linear=True)
+    # tstdir = Path('/home/u0133458/sftp/ko/un3/ic2/brt') / 'l0.0001_ti_int'
+    # inf_main(tstdir, p1='fcc',linear=True)
 
