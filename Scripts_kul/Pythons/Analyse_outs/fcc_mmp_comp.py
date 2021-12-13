@@ -46,22 +46,22 @@ def init():
             drg = Path(name).expanduser().absolute()
             if not drg.is_dir():
                 continue  # TODO: More checks!
-            try:
-                prg = getfl(drg)
-                if header:
-                    print('name, kr (s-1), kic(s-1), Temp (K), Ead (eV), tmax-ic (fs), dt-ic (fs), points-ic, lor/gau, '
-                          'FWHM (rcm), time/freq, time (s)')
-                    header = False
-                inf_main(drg, prg, linear=True)
-            except (FileNotFoundError, NotADirectoryError, OSError):
-                # except (FileNotFoundError, KeyError, NotADirectoryError):
-                print(
-                    'Error: Filenotfound; %s-Calculation not according to name-conventions '
-                    'or not finished correctly?' % name)
-                print('skipping following directory: %s' % name)
-                continue
+            prg = getfl(drg)
+            if header:
+                print('name, kr (s-1), kic(s-1), Temp (K), Ead (eV), tmax-ic (fs), dt-ic (fs), points-ic, lor/gau, '
+                      'FWHM (rcm), time/freq, time (s)')
+                header = False
+            inf_main(drg, prg, linear=True)
+            # except (FileNotFoundError, NotADirectoryError, OSError):
+            # except (FileNotFoundError, KeyError, NotADirectoryError):
+            # print(
+            #     'Error: Filenotfound; %s-Calculation not according to name-conventions '
+            #     'or not finished correctly?' % name)
+            # print('skipping following directory: %s' % name)
+            # continue
         exit(0)
 
+    # should only be accesible if no args.info
     for ix in range(len(args.folders) // 2):
         name1 = args.folders[2 * ix]
         drg1 = Path(name1).expanduser().absolute()
@@ -105,14 +105,17 @@ def inf_main(d1, p1='mmp', linear=False):
                         fl=%s
                         grep "Temperature" $fl | awk '{print "Temp",$3}'
                         grep -A1 "ADIABATIC ENERGY" $fl | tail -n1 | awk '{print "Ead", 0.0367484*$1}'
-                        grep "Total time" $fl | awk '{print "tmax",41.341373*$4}'
-                        grep "Time step" $fl | awk '{print "dt",41.341373*$5}'
-                        grep "data points" $fl | awk '{print "points",$5}'
+                        # grep "Total time" $fl | awk '{print "tmax",41.341373*$4}'
+                        # grep "Time step" $fl | awk '{print "dt",41.341373*$5}'
+                        # grep "data points" $fl | awk '{print "points",$5}'
+                        grep "tfin  =" $fl | awk '{print "tmax",41.341373*$3}'
+                        grep "dt    =" $fl | awk '{print "dt",41.341373*$3}'
+                        grep "ntime =" $fl | awk '{print "points",$3}'
                         grep "Broad. function" $fl | awk '{print "BroadenType",$4}'
-                        grep -E "HWHM {5}" $fl | awk '{print "FWHM",2*0.0367485*$3}'
+                        grep -E "HWHM {9}=" $fl | awk '{print "FWHM",2*0.0367485*$3}'
                         grep "Broad. exponent" $fl | awk '{print "brexp", $4}'
 END
-                        """ % kicout
+                        """ % kicout  # Total time, timestep etc not working with TI --> tfin, dt, ntime
         elif p1 == 'mmp':
             script = """grep -E "(Temp|Ead|tmax|dt|isgauss|Broaden.*|FWHM) {15}" %s/kic/ic.tvcf.log | awk '{print $1,
             $3}' | xargs echo""" % d1
@@ -143,7 +146,8 @@ END
 
     def rts_from_spec(ead, points=10):  # todo: how to choose points?; #todo: Show graph?; .......
         if p1 == 'fcc':
-            fomat = np.genfromtxt(d1 / 'kic/kic_vs_Ead_TD.dat')
+            plotfile = [y for y in d1.glob('kic/kic_vs_Ead_T?.dat')][0]
+            fomat = np.genfromtxt(plotfile)
         else:  # p1 == 'mmp':
             fomat = np.genfromtxt(d1 / 'kic/ic.tvcf.fo.dat', delimiter="")
             fomat = fomat[:, [1, 5]]
@@ -151,7 +155,11 @@ END
         # fo_smo = fomat[:, 1]
         xval = lts.closest(fomat[:, 0], abs(ead))
         yval = fo_smo[list(fomat[:, 0]).index(xval)]
-        ytestval = fo_smo[list(fomat[:, 0]).index(xval) + 1]
+        try:
+            ytestval = fo_smo[list(fomat[:, 0]).index(xval) + 1]
+        except IndexError:
+            print(f'    kic-val on edge of plotted region? index = {list(fomat[:, 0]).index(xval)} of {len(fo_smo)}')
+            ytestval = fo_smo[list(fomat[:, 0]).index(xval) - 1]
         try:
             if math.log10(ytestval) - math.log10(yval) > 0.05:
                 print('\n      watch out, smoothing not complete! %0.2e %0.2e' % (yval, ytestval))
@@ -163,8 +171,10 @@ END
     def times():
         if p1 == 'fcc':
             script = """
-                        grep "CPU (s)   " %s/{abs,emi,kic}/*.out | awk '{print $4}'
-                        """ % d1
+                        grep -H "CPU (s)   " %s/{abs,emi,kic}/*.out | awk '{print $4}' 
+                        """ % d1  # adding -H to allow for 1 file; but maybe it is better if this gives an error?
+            # Although normally this problem should be catched before
+            # --> So this should be totally unnecessary :p
             p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
             # print(p.stdout.readline().decode('utf8'))
             # tms = [int(elem) for elem in p.stdout.readline().decode('utf8')]
@@ -188,15 +198,19 @@ END
         if datdic['isgauss'] == '.f.':
             datdic['BroadenType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', '-', '-'
         if re.search('LOR', datdic['BroadenType']):  # more exact fwhm
-            datdic['FWHM'] = datdic['brexp']*2
+            datdic['FWHM'] = datdic['brexp'] * 2
         elif re.search('GAU', datdic['BroadenType']):
-            datdic['FWHM'] = 2* math.sqrt(
+            datdic['FWHM'] = 2 * math.sqrt(
                 2 * datdic['brexp'] / (math.sqrt(2 * math.log10(2))))  # todo: test this expression
 
-        prntln = '%s, %0.2e, %0.2e, %d, %0.3f, %0.0f, %0.3f, %0.0f, %s, %0.2e, %s, %d, %0.2e' % (
-            d1.parts[-1], kr, kic, datdic['Temp'], datdic['Ead'] * 27.212, datdic['tmax'] * 0.0241888,
-            datdic['dt'] * 0.0241888, datdic['points'], datdic['BroadenType'][0:3], datdic['FWHM'] * 219474,
-            datdic['Broadenfunc'], sum(tms), datdic['rtsfsp'])
+        # prntln = '%s, %0.3e, %0.3e, %d, %0.3f, %0.0f, %0.3f, %0.0f, %s, %0.2e, %s, %d, %0.2e' % (
+        #     d1.parts[-1], kr, kic, datdic['Temp'], datdic['Ead'] * 27.212, datdic['tmax'] * 0.0241888,
+        #     datdic['dt'] * 0.0241888, datdic['points'], datdic['BroadenType'][0:3], datdic['FWHM'] * 219474,
+        #     datdic['Broadenfunc'], sum(tms), datdic['rtsfsp'])
+        prntln = f"{d1.parts[-1]}, {kr:.3e}, {kic:.3e}, {int(datdic['Temp'])}, {(datdic['Ead'] * 27.212):.3f}," \
+                 f" {(datdic['tmax'] * 0.0241888):.0f}, {(datdic['dt'] * 0.0241888):.3f}, {datdic['points']:.0f}," \
+                 f" {datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, {datdic['Broadenfunc']}," \
+                 f" {int(sum(tms))}, {datdic['rtsfsp']:.2e}"
         if str(datdic['rtsfsp'])[0:2] == str(kic)[0:2]:
             prntln = prntln.rsplit(' ', 1)[0]
         print(prntln.replace('-inf', '-'))
@@ -431,4 +445,8 @@ def dus_main(d1, d2, p1='mmp', p2='fcc'):
 
 
 if __name__ == '__main__':
-    init()
+    # init()
+    # TEST
+    tstdir = Path('/home/u0133458/sftp/ko/un3/ic2/brt') / 'l0.0001_ti_int'
+    inf_main(tstdir, p1='fcc',linear=True)
+
