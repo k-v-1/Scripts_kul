@@ -103,19 +103,21 @@ def inf_main(d1, p1='mmp', linear=False):
             script = """
                         cat <<'END' | sh | xargs echo
                         fl=%s
-                        grep "Temperature" $fl | awk '{print "Temp",$3}'
-                        grep -A1 "ADIABATIC ENERGY" $fl | tail -n1 | awk '{print "Ead", 0.0367484*$1}'
+                        grep -F "Temperature" $fl | awk '{print "Temp",$3}'
+                        grep -F -A1 "ADIABATIC ENERGY" $fl | tail -n1 | awk '{print "Ead", 0.0367484*$1}'
                         # grep "Total time" $fl | awk '{print "tmax",41.341373*$4}'
                         # grep "Time step" $fl | awk '{print "dt",41.341373*$5}'
                         # grep "data points" $fl | awk '{print "points",$5}'
-                        grep "tfin  =" $fl | awk '{print "tmax",41.341373*$3}'
-                        grep "dt    =" $fl | awk '{print "dt",41.341373*$3}'
-                        grep "ntime =" $fl | awk '{print "points",$3}'
-                        grep "Broad. function" $fl | awk '{print "BroadenType",$4}'
+                        grep -F "tfin  =" $fl | awk '{print "tmax",41.341373*$3}'
+                        grep -F "dt    =" $fl | awk '{print "dt",41.341373*$3}'
+                        grep -F "ntime =" $fl | awk '{print "points",$3}'
+                        grep -F "Broad. function" $fl | awk '{print "BroadenType",$4}'
                         grep -E "HWHM {9}=" $fl | awk '{print "FWHM",2*0.0367485*$3}'
-                        grep "Broad. exponent" $fl | awk '{print "brexp", $4}'
+                        grep -F "Broad. exponent" $fl | awk '{print "brexp", $4}'
 END
                         """ % kicout  # Total time, timestep etc not working with TI --> tfin, dt, ntime
+            # TODO BROADFUN search for TI-case?
+            # TODO fgreps?
         elif p1 == 'mmp':
             script = """grep -E "(Temp|Ead|tmax|dt|isgauss|Broaden.*|FWHM) {15}" %s/kic/ic.tvcf.log | awk '{print $1,
             $3}' | xargs echo""" % d1
@@ -160,13 +162,15 @@ END
         try:
             ytestval = fo_smo[list(fomat[:, 0]).index(xval) + 1]
         except IndexError:
-            print(f'    kic-val on edge of plotted region? index = {list(fomat[:, 0]).index(xval)} of {len(fo_smo)}')
+            print(
+                f'{d1.parts[-1]}      ,kic-val on edge of plotted region? index =, {list(fomat[:, 0]).index(xval)}, {len(fo_smo)}')
             ytestval = fo_smo[list(fomat[:, 0]).index(xval) - 1]
+        smoothmessage = f'{d1.parts[-1]}      , SmoothingNotComplete!, {yval:0.2e}, {ytestval:0.2e}'
         try:
             if math.log10(ytestval) - math.log10(yval) > 0.05:
-                print('\n      watch out, smoothing not complete! %0.2e %0.2e' % (yval, ytestval))
+                print(smoothmessage)
         except ValueError:
-            print('\n      watch out, smoothing not complete! %0.2e %0.2e' % (yval, ytestval))
+            print(smoothmessage)
 
         return yval
 
@@ -201,10 +205,6 @@ END
             datdic['FWHM'] = 2 * math.sqrt(
                 2 * datdic['brexp'] / (math.sqrt(2 * math.log10(2))))  # todo: test this expression
 
-        # prntln = '%s, %0.3e, %0.3e, %d, %0.3f, %0.0f, %0.3f, %0.0f, %s, %0.2e, %s, %d, %0.2e' % (
-        #     d1.parts[-1], kr, kic, datdic['Temp'], datdic['Ead'] * 27.212, datdic['tmax'] * 0.0241888,
-        #     datdic['dt'] * 0.0241888, datdic['points'], datdic['BroadenType'][0:3], datdic['FWHM'] * 219474,
-        #     datdic['Broadenfunc'], sum(tms), datdic['rtsfsp'])
         prntln = f"{d1.parts[-1]}, {kr:.3e}, {kic:.3e}, {int(datdic['Temp'])}, {(datdic['Ead'] * 27.212):.3f}," \
                  f" {(datdic['tmax'] * 0.0241888):.0f}, {(datdic['dt'] * 0.0241888):.3f}, {datdic['points']:.0f}," \
                  f" {datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, {datdic['Broadenfunc']}," \
@@ -447,4 +447,3 @@ if __name__ == '__main__':
     # TEST
     # tstdir = Path('/home/u0133458/sftp/ko/un3/ic2/brt') / 'l0.0001_ti_crt'
     # inf_main(tstdir, p1='fcc',linear=True)
-
