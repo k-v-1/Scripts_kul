@@ -38,10 +38,13 @@ def init():
             continue
     fls.sort()  # in or out the loop? eg do i want to keep user sequence?
     for flname in fls:
-        with open(flname, 'r') as fl:
-            if 'Entering Gaussian System' not in fl.read():  # (faster than re.search)
-                continue
-        main(flname, outname=csvname, fc=args.force)
+        try:
+            with open(flname, 'r') as fl:
+                if 'Entering Gaussian System' not in fl.read():  # (faster than re.search)
+                    continue
+            main(flname, outname=csvname, fc=args.force)
+        except UnicodeError:
+            continue
 
     if csvname.is_file():
         with open(csvname, 'r+') as csvfile:
