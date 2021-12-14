@@ -88,6 +88,7 @@ PS1='%(?.%F{green}√.%F{red}?%?)%f %F{yellow}SET2%f%B%F{cyan}${"$(spwd)"//\/h\/
 
 ls
 
+stty -ixon
 source /home/u0133458/.config/broot/launcher/bash/br
 #~/.testshift.sh
 

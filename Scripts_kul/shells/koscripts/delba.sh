@@ -3,7 +3,7 @@ echo ""
 if [[ `find . -maxdepth 1 -name '*.gjf-batch.log'` != "" ]]; then
 for bat in ./*.gjf-batch.log; do
     leng=$(/usr/bin/wc -l $bat)
-    if [[ ${leng} == *"8"* ]]; then
+    if [[ ${leng} == *"8"* ]] || [[ ${leng} == *"0"* ]] ; then
         rm -i $bat
     else
         echo $bat
