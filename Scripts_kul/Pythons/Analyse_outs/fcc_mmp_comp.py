@@ -132,9 +132,11 @@ END
         if p1 == 'fcc':
             script = """
                         fl=%s
-                        cat $fl/*/*.out | grep "kr(s-1) =" | awk '{print $3}'
-                        cat $fl/*/*.out | grep "IC rate constant (s-1)" | awk '{print $5}'
-                        """ % d1
+                        tail -n40 $fl/*/*.out | grep "kr(s-1) =" | awk '{print $3}'
+                        tail -n40 $fl/*/*.out | grep "IC rate constant (s-1)" | awk '{print $5}'
+                        # cat $fl/*/*.out | grep "kr(s-1) =" | awk '{print $3}'
+                        # cat $fl/*/*.out | grep "IC rate constant (s-1)" | awk '{print $5}'
+                        """ % d1  # Speedup with tail!
         else:  # p1 == 'mmp':
             script = """
                         fl=%s
@@ -171,13 +173,9 @@ END
     def times():
         if p1 == 'fcc':
             script = """
-                        grep -H "CPU (s)   " %s/{abs,emi,kic}/*.out | awk '{print $4}' 
-                        """ % d1  # adding -H to allow for 1 file; but maybe it is better if this gives an error?
-            # Although normally this problem should be catched before
-            # --> So this should be totally unnecessary :p
+                        tail %s/{abs,emi,kic}/*.out | grep "CPU (s)   " | awk '{print $3}' 
+                        """ % d1  # Speeding up with tail!! # no use of f-string, due to {}'s
             p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
-            # print(p.stdout.readline().decode('utf8'))
-            # tms = [int(elem) for elem in p.stdout.readline().decode('utf8')]
             return [float(line.decode('utf8')) for line in p.stdout.readlines()]
         elif p1 == 'mmp':
             return None
@@ -447,6 +445,6 @@ def dus_main(d1, d2, p1='mmp', p2='fcc'):
 if __name__ == '__main__':
     init()
     # TEST
-    # tstdir = Path('/home/u0133458/sftp/ko/un3/ic2/brt') / 'l0.0001_ti_int'
+    # tstdir = Path('/home/u0133458/sftp/ko/un3/ic2/brt') / 'l0.0001_ti_crt'
     # inf_main(tstdir, p1='fcc',linear=True)
 
