@@ -1,6 +1,6 @@
 #!python3
 import argparse
-import os
+# import os
 import matplotlib.pyplot as plt
 import numpy as np
 import math
@@ -10,7 +10,7 @@ from pathlib import Path
 uconv = {'nm': 1239.849, 'rcm': 8065.5, 'cm-1': 8065.5, 'ev': 1, 'au': 0.0367}
 colconv = {'nm': 3, 'rcm': 2, 'cm-1': 2, 'ev': 1, 'au': 0}
 fntsz = 10
-lnsz = 0.8
+lnsz = 1  # 0.8
 
 
 def init():
@@ -30,9 +30,9 @@ def init():
 
         for meth in ['TD', 'TI']:
             if not args.nospec:
-                filabs = dirgen/'abs' / f'spec_Int_{meth}.dat'
-                filemi = dirgen/'emi' / f'spec_Int_{meth}.dat'
-                filkr = dirgen/'kr' / 'spec.tvcf.spec.dat'
+                filabs = dirgen / 'abs' / f'spec_Int_{meth}.dat'
+                filemi = dirgen / 'emi' / f'spec_Int_{meth}.dat'
+                filkr = dirgen / 'kr' / 'spec.tvcf.spec.dat'
                 if filabs.is_file():
                     genspec_fcc(filabs, filemi, unit=args.unit, axval=args.axis, onefig=args.onefig)
                     break
@@ -40,11 +40,11 @@ def init():
                     genspec_mmp(filkr, unit=args.unit, axval=args.axis, onefig=args.onefig)
                     break
                 else:
-                    print(f'no spectra in folder ({meth})')
+                    print(f'no spectra in folder ({meth}) - {folder}')
         for meth in ['TD', 'TI']:
             if not args.nokic:
-                filkic = dirgen/'kic' / f'kic_vs_Ead_{meth}.dat'
-                filkic2 = dirgen/'kic' / 'ic.tvcf.fo.dat'
+                filkic = dirgen / 'kic' / f'kic_vs_Ead_{meth}.dat'
+                filkic2 = dirgen / 'kic' / 'ic.tvcf.fo.dat'
                 if filkic.is_file():
                     genkicspec(filkic, p1='fcc', unit=args.unit, axval=args.axis, klog=args.logkic, onefig=args.onefig)
                     break
@@ -52,7 +52,7 @@ def init():
                     genkicspec(filkic, p1='mmp', unit=args.unit, axval=args.axis, klog=args.logkic, onefig=args.onefig)
                     break
                 else:
-                    print(f'no ic-file found ({meth})')
+                    print(f'no ic-file found ({meth}) - {folder}')
 
     plt.legend()
     plt.show()

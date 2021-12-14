@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/Pythons/Inscripts" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/Pythons" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/Pythons/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/venv" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.8 (Scripts_kul)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
