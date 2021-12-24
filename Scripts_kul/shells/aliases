@@ -1,3 +1,5 @@
+##
+# adding the #s for color, no idea why this works :p
 export SCRPTS=/home/u0133458/PycharmProjects/Scripts_kul
 alias ls='ls --color=auto'
 alias l=ls
@@ -5,7 +7,7 @@ alias ll='ls -lh'
 alias la='ls -A'
 alias llog='ls *.log'
 alias vo='vi -O'
-alias lt='ls -lrt | tail'
+alias lt='ls -lhrt | tail'
 alias ccc='cd ~/Documents/Calc'
 alias cs=". $SCRPTS/shells/cs"
 #alias gabedit=~/GabeditSrc250/gabedit
@@ -14,8 +16,10 @@ alias remember='xdg-open ~/Documents/Calc/CodeToRemember.txt'
 alias gv='~/.gv/gview.sh'
 alias ccd='cd; cd -'
 
-alias rsyng='rsync -auv --exclude="*.chk" --exclude="*.fchk"'
-alias rsynh='rsync -auvOh --exclude="*.chk" --progress'
+alias rsyng='rsync -auvh --exclude="*.chk" --exclude="*.fchk"'
+alias rsycf='rsync -auvh --exclude="*.chk" --exclude="*.fchk"'
+alias rsynh='rsync -auvh --exclude="*.chk" --progress'
+alias rsyc='rsync -auvh --exclude="*.chk" --progress'
 alias ct1='sshfs t1:/user/leuven/331/vsc33143 ~/sftp/t1/home;sshfs t1:/data/leuven/331/vsc33143 ~/sftp/t1/data; cs ~/sftp/t1/home'
 alias ct2='sshfs t2:/user/leuven/331/vsc33143 ~/sftp/t2/home;sshfs t2:/data/leuven/331/vsc33143 ~/sftp/t2/data; cs ~/sftp/t2/home'
 alias cko="sshfs : ~/sftp/ko -o ssh_command='ssh t2 -t ssh ko'; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"

@@ -23,6 +23,8 @@ if exists("+termguicolors")
     set background=dark
     set t_Co=256
     colorscheme monokai_pro
+else
+    colorscheme elflord
 endif
 let g:lightline = {
       \ 'colorscheme': 'monokai_pro',
@@ -42,6 +44,7 @@ set number " Show line numbers.
 " This is useful because you can tell, at a glance, what count is needed to
 " jump up or down to a particular line, by {count}k to go up or {count}j to go
 " down.
+"set relativenumber #Not working in vim7.3 without patch
 set relativenumber
 set laststatus=2 " Always show the status line at the bottom, even if you only have one window open.
 
@@ -91,9 +94,9 @@ nnoremap <Down>  :echoe "Use j"<CR>
 vnoremap <Tab> <S->>gv
 vnoremap <S-Tab> <S-<>gv
 " Jump to last edit position on opening file
- if has("autocmd")                                                                             
-   au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
- endif
+if has("autocmd")                                                                             
+  au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+endif
 
 " disable time-delay when switching modes (see also tmux.conf)
 set timeoutlen=1000 ttimeoutlen=0
