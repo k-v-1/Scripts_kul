@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 import argparse
+import sys
 from pathlib import Path
 import subprocess
 
 
 def init():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('infile1', type=str, help='File to read {abs}data from: gaussian-fchk')
-    parser.add_argument('infile2', nargs='?', type=str, help='File to read {emi,nac}data from: gaussian-fchk',
-                        default=None)
+    parser.add_argument('infile1', type=str,
+                        help='File to read {abs}data from: gaussian-{log/fchk}')
+    parser.add_argument('infile2', nargs='?', type=str, default=None,
+                        help='[Optional] File to read {emi,nac}data from: gaussian-{log/fchk}')
     parser.add_argument('-e', '--eldip', nargs='?', type=str, default=None, const='edm.fcc',
                         help='extract eldips in edm.fcc or [name]')
     parser.add_argument('-m', '--magdip', nargs='?', type=str, default=None, const='mdm.fcc',
@@ -22,37 +24,39 @@ def init():
 
     file1 = Path(args.infile1).expanduser().absolute()
     file2 = Path(args.infile2).expanduser().absolute() if args.infile2 is not None else None
+    # Check existence of files
     if file2 is None:
         if not file1.is_file():
-            print(f'{args.infile1} is not a file')
+            print(f'{file1} is not a file', file=sys.stderr)
             exit(1)
     elif not (file1.is_file() and file2.is_file()):
-        print(f'{args.infile1} or {args.infile2} is not a file')
+        print(f'{args.infile1} or {args.infile2} is not a file', file=sys.stderr)
         exit(1)
+    # Parse excited state numbers; if given one: transition from 0 to n. (only one implemented)
     if len(args.states) == 1:
         stnum = args.states[0]  # [-1] == [0]
     elif len(args.states) == 2:
         if args.states[0] == 0:
             stnum = args.states[1]
         else:
-            print(f'state {args.states[0]} to state {args.states[1]} not yet implemented')
+            print(f'state {args.states[0]} to state {args.states[1]} not yet implemented', file=sys.stderr)
             exit(3)
     else:
-        print('number of states should be 1 or 2')
+        print('number of states should be 1 or 2', file=sys.stderr)
         exit(1)
 
     if args.eldip is not None:
         edmfile = cwd / args.eldip
         edmfile.touch()
         if edmfile.stat().st_size > 2000:
-            print("nac-file already exist and is large, first delete this file manually")
+            print("nac-file already exist and is large, first delete this file manually", file=sys.stderr)
             exit(2)
         suf1 = file1.suffix[1:]
         # noinspection PyUnboundLocalVariable
         ellst = eval(suf1 + f'_em("{file1}",{stnum},"e")')
         if ellst:
             with open(edmfile, "w") as wr:
-                wr.write(" ".join(ellst)+'\n')
+                wr.write(" ".join(ellst) + '\n')
         else:
             print("no eldips in file")
         if file2 is not None:
@@ -60,8 +64,7 @@ def init():
             ellst2 = eval(suf2 + f'_em("{file2}",{stnum},"e")')
             if ellst2:
                 with open(edmfile, "a") as wr:
-                    wr.write(" ".join(ellst2)+'\n')
-                    wr.write("\n")
+                    wr.write(" ".join(ellst2) + '\n\n')
             else:
                 print("no eldips in file")
 
@@ -116,8 +119,11 @@ def fchk_em(fcfl, esn, em):
 
 
 def log_em(fcfl, esn, em):
-    print("TODO")
-    return [0, 0, 0]
+    emdic = {'e': 'electric', 'm': 'magnetic'}
+    script = f"grep -F -A{esn+1} 'transition {emdic[em]} dipole moments' {fcfl} | tail -n1 | awk '{{print $2, $3, $4}}'"
+    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
+    etran = p.stdout.readline().decode('utf8').split()
+    return etran
 
 
 def fchk_nac(fcfl, esn=1):
@@ -139,9 +145,15 @@ def fchk_nac(fcfl, esn=1):
     return naclst
 
 
-def log_nac(fcfl, esn):
-    print("TODO")
-    return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+def log_nac(fcfl, esn=1):
+    script = """
+    filename=%s
+    atnum=($(grep -F 'NAtoms=' $filename  | awk '{print $2}'))
+    grep -F -A$((${atnum}+2)) 'Nonadiabatic Coup' $filename | tail -n${atnum} | awk '{print $3, $4, $5}' | tr '\n' ' '
+    """ % fcfl
+    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
+    naclst = [float(f) for f in p.stdout.readline().decode('utf8').split()]
+    return naclst
 
 
 if __name__ == '__main__':
