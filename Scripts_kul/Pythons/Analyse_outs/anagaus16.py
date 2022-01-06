@@ -3,6 +3,7 @@ import re
 import csv
 from pathlib import Path
 
+
 # import numpy as np
 # from collections import defaultdict
 
@@ -10,10 +11,16 @@ from pathlib import Path
 def init():
     parser = ArgumentParser()
     parser.add_argument("dirname", nargs='+', help="Give list of folders and/or files for analysis")
-    parser.add_argument("-v", help="Output to stdout, no csv-output, unless -o or -w specified", action="store_true")
+    parser.add_argument("-v", "--verbose", help="Output to stdout, no csv-output, unless -o or -w specified",
+                        action="store_true")
     parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
     parser.add_argument("-o", "--outfile", help="Give name of csv-file")
     parser.add_argument("-f", "--force", help="Force analysis of  vertical transition (vt, fc).", action="store_true")
+    parser.add_argument("-s", "--space", help="More readable output by adding Space between words. Same as -r",
+                        action="store_true")
+    parser.add_argument("-r", "--readable", help="More readable output by adding Space between words. Same as -s",
+                        action="store_true")
+    parser.add_argument("-t", "--time", help="Output time in seconds instead of hours.", action="store_true")
     args = parser.parse_args()
     if args.outfile:
         csvname = Path(args.outfile).expanduser().absolute()
@@ -42,7 +49,7 @@ def init():
             with open(flname, 'r') as fl:
                 if 'Entering Gaussian System' not in fl.read():  # (faster than re.search)
                     continue
-            main(flname, outname=csvname, fc=args.force)
+            main(flname, outname=csvname, fc=args.force, t_unit=args.time)
         except UnicodeError:
             continue
 
@@ -51,10 +58,27 @@ def init():
             content = csvfile.read()
             csvfile.seek(0, 0)
             csvfile.write('name, o/f, time, imag, gse/ese, zpe, esopt, emmE-eV, f, ifweights\n' + content)
-        if args.v:
+        if args.verbose:
             print()
             with open(csvname, 'r') as csvfile:
-                [print(line.rstrip()) for line in csvfile.readlines()]
+                if args.space or args.readable:
+                    colms = [ln.split(',')[0:3] for ln in csvfile.readlines()]
+                    csvfile.seek(0, 0)
+                    namelen = max([len(st[0]) for st in colms])
+                    timelen = max([len(st[2]) for st in colms])
+                    for line in csvfile.readlines():
+                        ll = line.replace('\n', '').replace('ifweights', 'i,f,999').split(',')
+                        [ll.append('') for _ in range(9 - len(ll))]
+
+                        def fun(x, y): return x + ' ' * (y - len(x))
+
+                        ifcoefs = [', '.join(ll[i + 9:i + 12]) for i in range(0, len(ll[9:]), 3) if
+                                   float(ll[i + 11]) > 0.2]
+                        print(f"{fun(ll[0], namelen)}, {fun(ll[1], 13)}, {fun(ll[2], timelen)}, {fun(ll[3], 5)},"
+                              f"{fun(ll[4], 14)}, {fun(ll[5], 8)}, {fun(ll[6], 6)}, {fun(ll[7], 7)}, {fun(ll[8], 6)},"
+                              f"{', '.join(ifcoefs)}")
+                else:
+                    [print(line.rstrip()) for line in csvfile.readlines()]
             if not args.w and not args.outfile:
                 csvname.unlink()
     else:
@@ -62,13 +86,14 @@ def init():
         exit(1)
 
 
-def main(filename, outname, fc=False):
+def main(filename, outname, fc=False, t_unit=False):
     basename = filename.name
 
+    # noinspection PyTypeChecker
     def log1out(infile, outfile):
         name = infile.name
         print(name)  # , filedict)
-        filedict = start_ana(infile)
+        filedict = start_ana(infile, t_unit)
         row1 = [name, filedict['genprops']['o/f'], filedict['genprops']['time'], filedict['genprops']['imag']]
         if filedict['gsprops'] is not None:
             row1.append(filedict['gsprops']['gse'])
@@ -85,10 +110,11 @@ def main(filename, outname, fc=False):
             [row1.append(k) for k in filedict['esprops']['esdict'][es]['ifcoefs']]
         outfile.writerow(row1)
 
+    # noinspection PyTypeChecker
     def logFCout(infile, outfile):
         name = infile.name
         print(name)  # , filedict)
-        filedict = start_ana(infile)
+        filedict = start_ana(infile, t_unit)
         try:
             esp = filedict['esprops']['esdict']
         except TypeError:
@@ -118,11 +144,15 @@ def main(filename, outname, fc=False):
             log1out(filename, csvw)
 
 
-def dhms2time(d, h, m, s):
-    return float(d) * 86400 + float(h) * 3600 + float(m) * 60 + float(s)
+def dhms2time(d, h, m, s, unit=False):
+    if unit:
+        return float(d) * 86400 + float(h) * 3600 + float(m) * 60 + float(s)
+    else:
+        return float(d) * 24 + float(h) + float(m) / 60 + float(s)/3600
 
 
-def start_ana(totfile):
+# noinspection PyTypedDict
+def start_ana(totfile, t_unit=False):
     # Todo imag=None vs =0 --> difference in 0 and not finished (probably already possible with flags)
     # possibly imag=0 if of=True and el=2 --> not if only freq calc...
     # TODO: split of-flag into o and f (such that no error is given if only opt-calc)
@@ -152,7 +182,7 @@ def start_ana(totfile):
                     imag_num = int(imag_match.group(1))
                     filedic['genprops']['imag'] = imag_num
             if re.search('Elapsed', line):
-                el_time.append(dhms2time(line.split()[2], line.split()[4], line.split()[6], line.split()[8]))
+                el_time.append(dhms2time(line.split()[2], line.split()[4], line.split()[6], line.split()[8], t_unit))
                 filedic['genprops']['time'] = round(sum(el_time), 1)
                 el_flag = el_flag + 1
             if re.search('This state for optimization and[/]or second-order correction[.]', line):
@@ -220,13 +250,12 @@ def es_ana(totfile, dic, es_opt, es_max, linenums, of=True):
                 if ifcoef_match is not None:
                     weight = round(float(ifcoef_match.group(4)) ** 2 * 2, 2)
                     ifcoefslist = [int(ifcoef_match.group(1)), int(ifcoef_match.group(3)), weight]
-                    # ifcoefslist = [int(ifcoef_match.group(1)), int(ifcoef_match.group(3)), float(ifcoef_match.group(4))]
                     # [ifs_mat.append(k) for k in ifcoefslist]
                     ifs_mat.append(ifcoefslist)
                 else:
                     ifs_mat.sort(key=lambda x: x[2], reverse=True)
                     ifs_mat2 = []
-                    [[ifs_mat2.append(k) for k in l] for l in ifs_mat]
+                    [[ifs_mat2.append(k) for k in rw] for rw in ifs_mat]
                     esdict[es_num]['ifcoefs'] = ifs_mat2
                     ifs_flag = False
             if es_match is not None:
@@ -270,18 +299,3 @@ def gs_ana(totfile, dic, of=True):
 
 if __name__ == '__main__':
     init()
-
-# def tst():
-# main('/home/u0133458/Documents/Calc/testg16/')
-# main('/home/u0133458/Documents/Calc/bapr2021/5q_mecn/')
-# t_file = '/home/u0133458/Documents/Calc/testg16/132.log'
-# dic1 = start_ana(t_file)
-# print(dic1)
-# exit()
-# with open('/home/u0133458/Documents/Calc/testg16/114.log', "r") as fl:
-# endmatch = re.findall(r"(?:.|\n)*\n [-]{70}\n((?:.|\n)*)(?:\\{3}\n? ?|\\{2}\n \\|\\\n \\{2})@\n\n", fl.read(),
-#                       re.MULTILINE)
-# print(endmatch[0].replace('\n ', ''))
-# imag_match = re.search(r"NImag=(.{,3})\\{2}", endmatch[0].replace('\n ', ''))
-# print(imag_match.group(1))
-# /\\\n NImag=\d+\\\\|\\N\n Imag=\d+\\\\|\\NI\n mag=\d+\\\\|\\NIm\n ag=\d+\\\\|\\NIm\n ag=\d+\\\\|\\NIma\n g=\d+\\\\|\\NImag\n =\d+\\\\|\\NImag=\n \d+\\\\|\\NImag=\d+\n \d+\\\\|\\NImag=\d+\n \\\\|\\NImag=\d+\\\n \\|\\NImag=\d+\\\\/gm
