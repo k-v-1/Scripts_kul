@@ -15,13 +15,16 @@ def init():
                         action="store_true")
     parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
     parser.add_argument("-o", "--outfile", help="Give name of csv-file")
-    parser.add_argument("-f", "--force", help="Force analysis of  vertical transition (vt, fc).", action="store_true")
+    parser.add_argument("-f", "--force", help="Force analysis of vertical transition (vt, fc).", action="store_true")
     parser.add_argument("-s", "--space", help="More readable output by adding Space between words. Same as -r",
                         action="store_true")
     parser.add_argument("-r", "--readable", help="More readable output by adding Space between words. Same as -s",
                         action="store_true")
     parser.add_argument("-t", "--time", help="Output time in seconds instead of hours.", action="store_true")
+    parser.add_argument("-e", "--effi", help="Output efficiency instead of time (t_cpu/t_elapsed).", action="store_true")
     args = parser.parse_args()
+    if args.effi:
+        args.time = True
     if args.outfile:
         csvname = Path(args.outfile).expanduser().absolute()
     else:
@@ -49,7 +52,7 @@ def init():
             with open(flname, 'r') as fl:
                 if 'Entering Gaussian System' not in fl.read():  # (faster than re.search)
                     continue
-            main(flname, outname=csvname, fc=args.force, t_unit=args.time)
+            main(flname, outname=csvname, fc=args.force, t_unit=args.time, eff=args.effi)
         except UnicodeError:
             continue
 
@@ -75,7 +78,7 @@ def init():
                         ifcoefs = [', '.join(ll[i + 9:i + 12]) for i in range(0, len(ll[9:]), 3) if
                                    float(ll[i + 11]) > 0.2]
                         print(f"{fun(ll[0], namelen)}, {fun(ll[1], 13)}, {fun(ll[2], timelen)}, {fun(ll[3], 5)},"
-                              f"{fun(ll[4], 14)}, {fun(ll[5], 8)}, {fun(ll[6], 6)}, {fun(ll[7], 7)}, {fun(ll[8], 6)},"
+                              f"{fun(ll[4], 14)}, {fun(ll[5], 8)}, {fun(ll[6], 6)}, {fun(ll[7], 7)}, {fun(ll[8], 6)}, "
                               f"{', '.join(ifcoefs)}")
                 else:
                     [print(line.rstrip()) for line in csvfile.readlines()]
@@ -86,7 +89,7 @@ def init():
         exit(1)
 
 
-def main(filename, outname, fc=False, t_unit=False):
+def main(filename, outname, fc=False, t_unit=False, eff=False):
     basename = filename.name
 
     # noinspection PyTypeChecker
@@ -94,6 +97,8 @@ def main(filename, outname, fc=False, t_unit=False):
         name = infile.name
         print(name)  # , filedict)
         filedict = start_ana(infile, t_unit)
+        if eff:
+            filedict['genprops']['time'] = round(filedict['genprops']['cpu']/filedict['genprops']['time'],2)
         row1 = [name, filedict['genprops']['o/f'], filedict['genprops']['time'], filedict['genprops']['imag']]
         if filedict['gsprops'] is not None:
             row1.append(filedict['gsprops']['gse'])
@@ -115,6 +120,8 @@ def main(filename, outname, fc=False, t_unit=False):
         name = infile.name
         print(name)  # , filedict)
         filedict = start_ana(infile, t_unit)
+        if eff:
+            filedict['genprops']['time'] = round(filedict['genprops']['cpu']/filedict['genprops']['time'],2)
         try:
             esp = filedict['esprops']['esdict']
         except TypeError:
@@ -156,18 +163,11 @@ def start_ana(totfile, t_unit=False):
     # Todo imag=None vs =0 --> difference in 0 and not finished (probably already possible with flags)
     # possibly imag=0 if of=True and el=2 --> not if only freq calc...
     # TODO: split of-flag into o and f (such that no error is given if only opt-calc)
-    filedic = {'gsprops': None, 'esprops': None, 'genprops': {'time': 0, 'o/f': '', 'imag': None}}
+    filedic = {'gsprops': None, 'esprops': None, 'genprops': {'cpu':0, 'time': 0, 'o/f': '', 'imag': None}}
     with open(totfile, "r") as fl:
-        of_flag = False
-        oc_flag = 0
-        el_flag = 0
-        el_time = []
-        es_opt = 0
-        es_flag = False
-        es_max = 0
-        # imag_num = 0
-        er_flag = False
-        eslines = []
+        of_flag, es_flag, er_flag = False, False, False
+        el_flag, cpu_flag, oc_flag, es_opt, es_max = 0, 0, 0, 0, 0
+        el_time, cpu_time, eslines = [], [], []
         linenumber = 0
         for line in fl.readlines():
             linenumber = linenumber + 1
@@ -181,7 +181,11 @@ def start_ana(totfile, t_unit=False):
                 if imag_match is not None:
                     imag_num = int(imag_match.group(1))
                     filedic['genprops']['imag'] = imag_num
-            if re.search('Elapsed', line):
+            if re.search('Job cpu time', line):
+                cpu_time.append(dhms2time(line.split()[3], line.split()[5], line.split()[7], line.split()[9], t_unit))
+                filedic['genprops']['cpu'] = round(sum(cpu_time), 1)
+                cpu_flag = cpu_flag + 1
+            elif re.search('Elapsed', line):
                 el_time.append(dhms2time(line.split()[2], line.split()[4], line.split()[6], line.split()[8], t_unit))
                 filedic['genprops']['time'] = round(sum(el_time), 1)
                 el_flag = el_flag + 1
