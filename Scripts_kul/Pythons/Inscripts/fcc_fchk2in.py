@@ -22,6 +22,7 @@ def init():
     parser.add_argument('-s', '--states', nargs='+', type=int, default=[1],
                         help='Electronic state(s), when only one state: assuming 0-->n (default n=1)')
     parser.add_argument("-o", "--mmpnac", action="store_true", help="Use old nacme-approximation (used in momap)")
+    parser.add_argument("-r", "--root", action="store_true", help="Extract root from file")
     args = parser.parse_args()
     cwd = Path.cwd()
 
@@ -33,13 +34,6 @@ def init():
         if infile is not None and not infile.is_file():
             print(f'{infile} is not a file', file=sys.stderr)
             exit(1)
-    # if file2 is None:
-    #     if not file1.is_file():
-    #         print(f'{file1} is not a file', file=sys.stderr)
-    #         exit(1)
-    # elif not (file1.is_file() and file2.is_file()):
-    #     print(f'{args.infile1} or {args.infile2} is not a file', file=sys.stderr)
-    #     exit(1)
 
     # Parse excited state numbers; if given one: transition from 0 to n. (only one implemented)
     if len(args.states) == 1:
@@ -53,6 +47,9 @@ def init():
     else:
         print('number of states should be 1 or 2', file=sys.stderr)
         exit(1)
+    if args.root:
+        filer = [i for i in [file1, file2] if i is not None][-1]
+        stnum = eval(filer.suffix[1:]+f'_get_root("{filer}")')
 
     if args.eldip is not None:
         edmfile = cwd / args.eldip
@@ -117,6 +114,12 @@ def init():
 #     dE/dy1 dmux/dy1 dmuy/dy1 ... unkZ/dy1
 #     ...
 #     dE/dzN dmux/dzN dmuy/dzN ... unkZ/dzN
+def fchk_get_root(fcfl):
+    script = f"sed '/Route/,/Charge/!d' {fcfl} | tr '\n' ' ' |sed -e 's/ //g; s/^.*[rR][oO][oO][tT][=]\([0-9]\).*/\\1/'"
+    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
+    return int(p.stdout.readline().decode('utf8'))
+
+
 def fchk_em(fcfl, esn, em):
     nlines = esn * 16 // 5 + 1
     if em == 'e':
@@ -124,7 +127,8 @@ def fchk_em(fcfl, esn, em):
     elif em == 'm':
         n1 = esn * 16 - 9
     else:
-        return None
+        print('em should be "e"lectronic or "m"agnetic', file=sys.stderr)
+        exit(1)
     script = f"grep -F -A{nlines} 'ETran state values' {fcfl} | tail -n+2 | tr '\n' ' '"
     p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
     etran = p.stdout.readline().decode('utf8').split()
