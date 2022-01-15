@@ -49,7 +49,7 @@ def init():
         exit(1)
     if args.root:
         filer = [i for i in [file1, file2] if i is not None][-1]
-        stnum = eval(filer.suffix[1:]+f'_get_root("{filer}")')
+        stnum = get_root(filer,ext=filer.suffix[-1])
 
     if args.eldip is not None:
         edmfile = cwd / args.eldip
@@ -75,8 +75,7 @@ def init():
                 print(f"no eldips in file {file2}", file=sys.stderr)
 
     if args.nacme is not None:
-        inflst = [i for i in [file1, file2, file3] if i is not None]
-        filen = inflst[-1]
+        filen = [i for i in [file1, file2, file3] if i is not None][-1]
         sufn = filen.suffix[1:]
         if args.mmpnac:
             naclst = eval(sufn + f'_mmpnac("{filen}",{args.states[-1]})')
@@ -114,10 +113,28 @@ def init():
 #     dE/dy1 dmux/dy1 dmuy/dy1 ... unkZ/dy1
 #     ...
 #     dE/dzN dmux/dzN dmuy/dzN ... unkZ/dzN
-def fchk_get_root(fcfl):
-    script = f"sed '/Route/,/Charge/!d' {fcfl} | tr '\n' ' ' |sed -e 's/ //g; s/^.*[rR][oO][oO][tT][=]\([0-9]\).*/\\1/'"
-    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
-    return int(p.stdout.readline().decode('utf8'))
+def get_root(fcfl, ext='fchk', trans=False):
+    if not trans:
+        if ext == 'fchk':
+            script = f"sed '/Route/,/Charge/!d' {fcfl} | tr '\n' ' ' | sed -e 's/ //g; s/^.*root[=]\([0-9]\).*/\\1/i'"
+        else:
+            script = "grep -F -A4 'This state for optimization' %s |tail -n1 | awk '{print $3-1}'" % fcfl
+    else:
+        if ext == 'fchk':
+            script = f"sed '/Route/,/Charge/!d' {fcfl} | tr '\n' ' ' | " \
+                     f"sed -e 's/ //g; s/^.*6\/29[=]\([0-9]\).*6\/30[=]\([0-9]\).*/\\1 \\2/i'"
+        else:
+            script = f"grep -F 'Electrostatic Properties Using The Transition Density' {fcfl} | sed 's/[a-z.:]/ /gi'"
+    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash').stdout.readline().decode(
+        'utf8')
+    if trans:
+        states = [int(i) for i in p.split()]
+        if len(states) == 1:
+            states.append(0)
+        states.sort()
+        return states
+    else:
+        return int(p)
 
 
 def fchk_em(fcfl, esn, em):
@@ -174,22 +191,32 @@ def log_nac(fcfl, esn=1):
 
 
 def log_mmpnac(fcfl, esn=1):
+    states = get_root(fcfl,ext='log',trans=True)
     script = """
     filename=%s
+    es1=%d
+    es2=%d
     atnum=($(grep -F 'NAtoms=' $filename  | awk '{print $2}'))
+    dE2=($(grep -F "Excited State   $es2" $filename | awk '{print $5}'))
+    if [[ $es1 -eq 0 ]]; then
+        dE=$dE2
+    else
+        dE=($(grep -F "Excited State   $es1" $filename | awk -v e2=$dE2 '{print e2-$5}'))
+    fi
     grep -F -A$((${atnum}+2)) 'Coordinates (Angstroms)' $filename | tail -n${atnum} | awk '{print $2}' | tr '\n' ' '
-    echo
-    grep -F -A$((${atnum}+2)) 'Electric Field' $filename | tail -n${atnum} | awk '{print $3, $4, $5}' | tr '\n' ' '
-    """ % fcfl
+    echo " $dE"
+    grep -F -A$((${atnum}+2)) 'Electric Field' $filename | tail -n${atnum} | awk '{print $4, $5, $6}' | tr '\n' ' '
+    """ % (fcfl, states[0], states[1])
     p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
     start = True
     naclst, zlst = [], []
     for line in p.stdout.readlines():
         if start:
-            zlst = [int(f) for f in line.decode('utf8').split()]
+            zlst = [int(f) for f in line.decode('utf8').split()[:-1]]
+            dener = float(line.decode('utf8').split()[-1])
             start = False
         else:
-            naclst = [float(tef) * zlst[fn // 3] for fn, tef in enumerate(line.decode('utf8').split())]
+            naclst = [float(tef) * zlst[fn // 3]/dener for fn, tef in enumerate(line.decode('utf8').split())]
     return naclst
 
 
