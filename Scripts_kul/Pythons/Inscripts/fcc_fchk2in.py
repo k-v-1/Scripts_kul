@@ -49,7 +49,7 @@ def init():
         exit(1)
     if args.root:
         filer = [i for i in [file1, file2] if i is not None][-1]
-        stnum = get_root(filer,ext=filer.suffix[-1])
+        stnum = get_root(filer,ext=filer.suffix[1:])
 
     if args.eldip is not None:
         edmfile = cwd / args.eldip
