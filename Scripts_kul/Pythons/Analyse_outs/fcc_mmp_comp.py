@@ -157,7 +157,7 @@ END
             fomat = fomat[:, [1, 5]]
         fo_smo = lts.smooth(fomat[:, 1], points)
         # fo_smo = fomat[:, 1]
-        xval = lts.closest(fomat[:, 0], abs(ead))
+        xval = lts.closest(fomat[:, 0], ead)
         yval = fo_smo[list(fomat[:, 0]).index(xval)]
         try:
             ytestval = fo_smo[list(fomat[:, 0]).index(xval) + 1]
@@ -190,9 +190,13 @@ END
         tms = [-1] * 3
     try:
         kr, kic = *rts,
+        kic2 = None
     except ValueError:
-        kr, kic = 0, 0
-        print('Error: No rates in file?')
+        try:
+            kr, kic, kic2 = *rts,
+        except ValueError:
+            kr, kic, kic2 = 0, 0, 0
+            print('Error: No rates in file?')
 
     if linear:
         datdic = getinp()
