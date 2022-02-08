@@ -1,4 +1,4 @@
-#! /bin/zsh
+#! /usr/bin/env zsh
 echo ""
 if [[ `find . -maxdepth 1 -name '*.gjf-batch.log'` != "" ]]; then
 for bat in ./*.gjf-batch.log; do
