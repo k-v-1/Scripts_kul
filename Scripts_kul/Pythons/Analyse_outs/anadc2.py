@@ -1,10 +1,20 @@
 #!python3
 import csv
+from math import floor, log10
 import re
 from argparse import ArgumentParser
 from pathlib import Path
 
-#todo: ess on different lines if ifcoefs is printed, but make option to do oneliner without ifcoefs (default)
+#structure: 
+"""
+init --> checks files, inits csv-file
+     --> calls main
+     --> prints csv-file
+    main --> calls start_ana
+         --> writes to csv-file
+        start_ana --> analyses outputfile
+                    = nodes, energy, time, error, multiplicity, osc. strength, orbital coefs, ...
+"""
 
 def init():
     parser = ArgumentParser()
@@ -23,6 +33,7 @@ def init():
     args = parser.parse_args()
     if args.effi:
         args.time = True
+    addspace = args.space or args.readable
     if args.outfile:
         csvname = Path(args.outfile).expanduser().absolute()
     else:
@@ -51,7 +62,7 @@ def init():
                 # if 'TURBOMOLE V7.1' not in fl.read():  # (faster than re.search)
                 if not re.search(r'ricc2 .* TURBOMOLE V7\.1',fl.read(),re.MULTILINE):
                     continue
-            main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi)
+            main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi, roundnum=addspace)
         except UnicodeError:
             continue
 
@@ -59,29 +70,42 @@ def init():
         with open(csvname, 'r+') as csvfile:
             content = csvfile.read()
             csvfile.seek(0, 0)
+            csvfile.write('name,err,time,mp2,es,s^2,emE-eV,f,es,s^2,emE-eV,f,es,s^2,emE-eV,f\n'+ content)
         if args.verbose:
+            def fun(x, y): return ' ' * (y - len(x)) + x
             print()
-            with open(csvname, 'r+') as csvfile:
-                if args.space or args.readable:
-                    pass
-                    # csvfile.write('name, o/f, time, imag, gse/ese, zpe, esopt, emmE-eV, f, ifweights\n' + content)
-                    # colms = [ln.split(',')[0:3] for ln in csvfile.readlines()]
-                    # csvfile.seek(0, 0)
-                    # namelen = max([len(st[0]) for st in colms])
-                    # timelen = max([len(st[2]) for st in colms])
-                    # for line in csvfile.readlines():
-                    #     ll = line.replace('\n', '').replace('ifweights', 'i,f,999').split(',')
-                    #     [ll.append('') for _ in range(9 - len(ll))]
-
-                    #     def fun(x, y): return x + ' ' * (y - len(x))
-
-                    #     ifcoefs = [', '.join(ll[i + 9:i + 12]) for i in range(0, len(ll[9:]), 3) if
-                    #                float(ll[i + 11]) > 0.2]
-                        # print(f"{fun(ll[0], namelen)}, {fun(ll[1], 13)}, {fun(ll[2], timelen)}, {fun(ll[3], 5)},"
-                            #   f"{fun(ll[4], 14)}, {fun(ll[5], 8)}, {fun(ll[6], 6)}, {fun(ll[7], 7)}, {fun(ll[8], 6)}, "
-                            #   f"{', '.join(ifcoefs)}")
+            with open(csvname, 'r') as csvfile:
+                if addspace:
+                    if args.long:
+                        colms = [ln.split(',')[0:3] for ln in csvfile.readlines()]
+                        namelen = max([len(st[0]) for st in colms])
+                        timelen = max([len(st[2]) for st in colms])
+                        esprint, gsprint = [], []
+                        csvfile.seek(0, 0)
+                        for line in csvfile.readlines():
+                            ll = line.replace('\n', '').replace('False', '').replace('ifweights', 'i,f,999').split(',')
+                            if len(ll) == 4:
+                                gsprint.append(f"{fun(ll[0], namelen+1)},{fun(ll[1], 4)},{fun(ll[2], timelen+1)},{fun(ll[3], 12)}\n")
+                            elif len(ll) == 16 and ll[0] == 'name':
+                                gsprint.append(f" {fun(ll[0], namelen+1)},{fun(ll[1], 4)},{fun(ll[2], timelen+1)},{fun(ll[3], 12)}\n")
+                                esprint.append('es,s2,  emE-eV,          f,  i,  f, %\n')
+                            else:
+                                ifcoefs = [', '.join(ll[i + 4:i + 7]) for i in range(0, len(ll[4:]), 3) if float(ll[i + 6]) > 5]
+                                esprint.append(f"{fun(ll[0], 2)},{fun(ll[1], 2)},{fun(ll[2], 8)},{fun(ll[3], 11)}, {', '.join(ifcoefs)}\n")
+                        print(*gsprint, '\n', *esprint)
+                    else:
+                        colms = [ln.split(',')[0:3] for ln in csvfile.readlines()]
+                        csvfile.seek(0, 0)
+                        namelen = max([len(st[0]) for st in colms])
+                        timelen = max([len(st[2]) for st in colms])
+                        for line in csvfile.readlines():
+                            ll = line.replace('\n', '').replace('False', '').replace('ifweights', 'i,f,999').split(',')
+                            # [ll.append('') for _ in range(9 - len(ll))]
+                            print(f"{fun(ll[0], namelen+1)},{fun(ll[1], 4)},{fun(ll[2], timelen+1)},{fun(ll[3], 12)} ,|"
+                                f"{fun(ll[4], 3)},{fun(ll[5], 4)},{fun(ll[6], 7)},{fun(ll[7], 6)} ,|"
+                                f"{fun(ll[8], 3)},{fun(ll[9], 4)},{fun(ll[10], 7)},{fun(ll[11], 6)} ,|"
+                                f"{fun(ll[12], 3)},{fun(ll[13], 4)},{fun(ll[14], 7)},{fun(ll[15], 6)}")
                 else:
-                    csvfile.write('name, err, time, es, s^2, emmE-eV, f, es, s^2, emmE-eV, f, es, s^2, emmE-eV, f\n'+ content)
                     [print(line.rstrip()) for line in csvfile.readlines()]
             if not args.w and not args.outfile:
                 csvname.unlink()
@@ -90,17 +114,39 @@ def init():
         exit(1)
 
 
-def main(infile, outname, long=False, t_unit=False, eff=False):
+def main(infile, outname, long=False, t_unit=False, eff=False, roundnum=False):
     with open(outname, 'a') as f:
-        name = infile.parent.name
+        name = infile.parent.parent.name
         csvw = csv.writer(f)
         print(name)  # , filedict)
         filedict = start_ana(infile, t_unit)
         if eff:
             filedict['wall'] = round(filedict['cpu']/filedict['wall']/filedict['nds']*100,2)
+        else:
+            filedict['wall'] = round(filedict['wall'], 2-int(floor(log10(abs(filedict['wall'])))))
         if long:
-            pass
-            # [row1.append(k) for k in filedict['esprops']['esdict'][es]['ifcoefs']]
+            csvw.writerow([name, filedict['err'], filedict['wall'], filedict['mp2_E']])
+            for es in filedict['esprops']:
+                row1 = [es]
+                esd = filedict['esprops'][es]
+                row1.append(esd['s2'])
+                row1.append(esd['emmE-eV'])
+                row1.append(esd['f'])
+                [row1.append(k) for k in esd['ifcoefs']]
+                csvw.writerow(row1)
+        elif roundnum:
+            filedict['mp2_E'] = round(filedict['mp2_E'], 6)
+            row1 = [name, filedict['err'], filedict['wall'], filedict['mp2_E']]
+            for es in filedict['esprops']:
+                row1.append(es)
+                esd = filedict['esprops'][es]
+                esd['emmE-eV'] = round(esd['emmE-eV'], 4)
+                esd['f'] = round(esd['f'], 3)
+                row1.append(esd['s2'])
+                row1.append(esd['emmE-eV'])
+                row1.append(esd['f'])
+            csvw.writerow(row1)
+
         else:
             row1 = [name, filedict['err'], filedict['wall'], filedict['mp2_E']]
             for es in filedict['esprops']:
@@ -163,9 +209,8 @@ def start_ana(totfile, t_unit=False):
                 ifstart = True
                 esnumc = int(ifsmatch.group(1))
             if ifstart:
-                ifmatch = re.search(r' +\| ([0-9]+) a +[0-9]+ +\| +([0-9]+) a +[0-9]+ +\|[0-9.-]+ +([0-9.]+) +\|', line)
+                ifmatch = re.search(r' +\| +([0-9]+) a +[0-9]+ +\| +([0-9]+) a +[0-9]+ +\| +[0-9.-]+ +([0-9.]+) +\|', line)
                 if ifmatch is not None:
-                    # print(esdict[esnumc]['ifcoefs'])#.append(ifmatch.group(1))
                     [esdict[esnumc]['ifcoefs'].append(ifmatch.group(i)) for i in [1,2,3]]
                 if re.search('norm of printed elements', line):
                     ifstart = False
