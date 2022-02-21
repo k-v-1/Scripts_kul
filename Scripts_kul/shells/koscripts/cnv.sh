@@ -22,8 +22,9 @@ for fl in $flst; do
 echo
 echo "$fl"
     if [[ "$short" == "True" ]]; then
-        grep -FA4 "Converged?" $fl | awk '{print $3,$4,$5}' | tr '\n' ' ' | sed 's/Threshold Converged?/\n/g; s/[0-9]*//g; s/NO/NO /g'|tail -n $tailnum; else
-        grep -FA4 "Converged?" $fl | awk '{print $3,$4,$5}' | tr '\n' ' ' | sed 's/Threshold Converged?/\n/g'|tail -n $tailnum
+        grep -FA6 "Converged?" $fl | sed -E '/^.*Predicted.*$/d; s/point so far[.]/x x Lowest/' |awk '{print $3,$4,$5}' | tr '\n' ' ' | sed 's/Threshold Converged?/\n/g; s/x x//g; s/[0-9]*//g; s/NO/NO /g'|tail -n $tailnum
+    else
+        grep -FA6 "Converged?" $fl | sed -E '/^.*Predicted.*$/d; s/point so far[.]/x x Lowest/' |awk '{print $3,$4,$5}' | tr '\n' ' ' | sed 's/Threshold Converged?/\n/g; s/x x//g'|tail -n $tailnum
     fi
 echo
 done
