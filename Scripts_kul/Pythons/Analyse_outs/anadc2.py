@@ -1,11 +1,11 @@
-#!python3
+#!/usr/bin/env python3
 import csv
 from math import floor, log10
 import re
 from argparse import ArgumentParser
 from pathlib import Path
 
-#structure: 
+# structure:
 """
 init --> checks files, inits csv-file
      --> calls main

@@ -1,4 +1,4 @@
-#!python3
+#!/usr/bin/env python3
 import argparse
 from pathlib import Path
 import re
@@ -177,7 +177,7 @@ END
     def times():
         if p1 == 'fcc':
             script = """
-                        tail %s/{abs,emi,kic}/*.out | grep "CPU (s)   " | awk '{print $3}' 
+                        tail %s/{abs,emi,kic}/*.out | grep "CPU (s)   " | awk '{print $3}'
                         """ % d1  # Speeding up with tail!! # no use of f-string, due to {}'s
             p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash')
             return [float(line.decode('utf8')) for line in p.stdout.readlines()]

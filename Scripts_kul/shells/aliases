@@ -28,6 +28,7 @@ alias cko1="sshfs ko: ~/sftp/ko; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; l
 alias alko="source ~/.koscripts/ko_aliases"
 
 alias anagaus='python3 $SCRPTS/Pythons/Analyse_outs/anagaus16.py'
+alias anafcc='python3 $SCRPTS/Pythons/Analyse_outs/anafcc.py'
 alias fmspec='python3 $SCRPTS/Pythons/Analyse_outs/fcc_mmp_spec.py 2> >(grep -v "Gtk-WARNING" >&2)'
 alias fmcomp='python3 $SCRPTS/Pythons/Analyse_outs/fcc_mmp_comp.py 2> >(grep -v "Gtk-WARNING" >&2)'
 alias i2j='python3 $SCRPTS/Pythons/Inscripts/coordscripts.py'
