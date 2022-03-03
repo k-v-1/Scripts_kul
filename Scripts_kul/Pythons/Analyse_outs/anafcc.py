@@ -2,14 +2,28 @@
 import argparse
 from pathlib import Path
 import re
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import math
 import subprocess
 import littlescripts as lts
 import sys
 
-# uconv = {'nm': 1239.849, 'rcm': 8065.5, 'cm-1': 8065.5, 'ev': 1}
+############
+# init: args from terminal: dirs of outputfiles
+#   --> get_fl
+#   --> inf_main
+# get_fl: folder -> list of valid output files
+# inf_main: file -> datdic + rate
+#   --> getinp
+#   --> rates
+#   --> rts_from_spec
+#   getinp: file -> infdic = temp, ead, t's, broad's,..
+#   rates:  file -> rate
+#   rts_from_spec: file -> rate (via k??_vs_ead.dat in same folder)
+############
+
+uconv = {'nm': 1239.849, 'rcm': 8065.5, 'cm-1': 8065.5, 'ev': 1}
 # colconv = {'nm': 3, 'rcm': 2, 'cm-1': 2, 'ev': 1}
 fntsz = 10
 lnsz = 0.8
@@ -19,30 +33,45 @@ def init():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('folders', type=str, nargs='+',
                         help='Folders containing output files [and rate_vs_ead-file]')
+    parser.add_argument('-e', '--ext', default='',type=str, help='extension for outputfiles (.out, .log, , ...)')
     # parser.add_argument('-i', '--info', action='store_true', help='Show only in&output information')
-    # parser.add_argument('-u', '--unit', type=str.lower, help='eV, nm, rcm=cm-1', default='ev')
     # parser.add_argument('-a', '--axis', type=float, nargs=2, help='specify x-axis values', default=None)
+    parser.add_argument('-S', '--Spec', action='store_true', help='Show spectra for IC, NR0', default=False)
+    parser.add_argument('-O', '--Onefig', action='store_true', help='Spec: add all graphs from a dir in 1 fig', default=True)
+    parser.add_argument('-U', '--Unit', type=str.lower, help='Spec: choose eV, nm, rcm=cm-1', default='ev')
+    parser.add_argument('-P', '--Points', type=int, help='Spec: number of points for smoothing', default=10)
     args = parser.parse_args()
 
     # TODO: Check all files on content and determine like this what filename to use for data obtaining
 
     header = True
+    if args.Onefig:
+        args.Spec = True
+    do_spec = {'spec':args.Spec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
+    def ratestr(rate):
+        try:
+            return f"{rate:.3e}"
+        except ValueError:
+            return rate
+
     for dirstr in args.folders:
         drg = Path(dirstr).expanduser().absolute()
         if not drg.is_dir():
             continue  # TODO: More checks!
         print(dirstr)
-        outlst = getfl(drg)
+        outlst = getfl(drg, ext=args.ext)
         if header:
             print('name, Ead (eV), l/g, FWHM (rcm), rate (s-1), rate_spec')
             header = False
         for outfl, outprop in outlst:
             # print(outfl.parent.relative_to(Path.cwd()))
-            datdic, rate = inf_main(outfl, outprop)
+            datdic, rate = inf_main(outfl, outprop, do_spec)
             prntln = f"{outfl.parent.relative_to(Path.cwd())}, {(datdic['Ead'] * 27.212):.3f}, "\
                      f"{datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, " \
-                     f"{rate:.3e}, {datdic['rtsfsp']:.3e}"
+                     f"{ratestr(rate)}, {ratestr(datdic['rtsfsp'])}"
             print(prntln)
+        plt.legend()
+        plt.show()
 
 
 def getfl(folder, ext=''):
@@ -113,19 +142,19 @@ def times(filepath):
     return float(p.readline().decode('utf8'))
 
 
-def rts_from_spec(filepath, ead, points=10):  # todo: how to choose points?; #todo: Show graph?; .......
+def rts_from_spec(filepath, ead, points=10, spec=True, unit='ev', onefig=False):  # todo: how to choose points?; #todo: Show graph?; .......
     plotfile = [y for y in filepath.parent.glob('k??_vs_Ead_T?.dat')][0]
     fomat = np.genfromtxt(plotfile)
-    fo_smo = lts.smooth(fomat[:, 1], points)
+    y_smo = lts.smooth(fomat[:, 1], points)
     # fo_smo = fomat[:, 1]
     xval = lts.closest(fomat[:, 0], ead)
-    yval = fo_smo[list(fomat[:, 0]).index(xval)]
+    yval = y_smo[list(fomat[:, 0]).index(xval)]
     try:
-        ytestval = fo_smo[list(fomat[:, 0]).index(xval) + 1]
+        ytestval = y_smo[list(fomat[:, 0]).index(xval) + 1]
     except IndexError:
         print(
-            f'{filepath.parts[-1]}      ,kic-val on edge of plotted region? index =, {list(fomat[:, 0]).index(xval)}, {len(fo_smo)}')
-        ytestval = fo_smo[list(fomat[:, 0]).index(xval) - 1]
+            f'{filepath.parts[-1]}      ,kic-val on edge of plotted region? index =, {list(fomat[:, 0]).index(xval)}, {len(y_smo)}')
+        ytestval = y_smo[list(fomat[:, 0]).index(xval) - 1]
     smoothmessage = f'{filepath.parts[-1]}      , SmoothingNotComplete!, {yval:0.2e}, {ytestval:0.2e}'
     try:
         if math.log10(ytestval) - math.log10(yval) > 0.05:
@@ -133,22 +162,38 @@ def rts_from_spec(filepath, ead, points=10):  # todo: how to choose points?; #to
     except ValueError:
         print(smoothmessage)
 
+    if spec:
+        xvals, yvals = fomat[:,0]*uconv[unit], fomat[:,1]
+        yvals = np.array([math.log10(abs(max(1, i))) for i in yvals])
+        y_smo = np.array([math.log10(abs(max(1, i))) for i in y_smo])
+        label = str(filepath.parent.relative_to(Path.cwd()))
+        if onefig:
+            fig = plt.figure(1, figsize=[3,3])
+            plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
+            plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, label=label)  # kic
+        else:
+            fig = plt.figure(label, figsize=[3,3])
+            # returns log(kic), except if kic is < 1 (negative), then 0
+            plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, color='k')  # kic
+            plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
+        plt.plot(ead, math.log10(yval), 'X', color='k')
+        fig.tight_layout()
     return yval
 
 
-def inf_main(flname, prop):
+def inf_main(flname, prop, specargs):
     datdic = getinp(flname)
     if prop in ['EMI', 'IC', 'NR0']:
         rt = rates(flname, prop)
         if rt is None:
-            rt = 0
+            rt = '  ---  '
             print(f'Error: No rates in file? {flname.relative_to(Path.cwd())}')
     else:
-        rt = 0
+        rt = '         '
     if prop in ['IC', 'NR0']:
-        datdic['rtsfsp'] = rts_from_spec(flname, datdic['Ead'] * 27.212)
+        datdic['rtsfsp'] = rts_from_spec(flname, datdic['Ead'] * 27.212, **specargs)
     else:
-        datdic['rtsfsp'] = 0
+        datdic['rtsfsp'] = '       '
 
     if datdic['isgauss'] == '.f.':
         datdic['BroadenType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', '-', '-'
