@@ -116,7 +116,8 @@ def init():
 
 def main(infile, outname, long=False, t_unit=False, eff=False, roundnum=False):
     with open(outname, 'a') as f:
-        name = infile.parent.parent.name
+        name = infile.parent.relative_to(Path.cwd())
+        # name = infile.parent.parent.name
         csvw = csv.writer(f)
         print(name)  # , filedict)
         filedict = start_ana(infile, t_unit)
@@ -166,7 +167,7 @@ def dhms2time(d, h, m, s, unit=False):
 
 
 def start_ana(totfile, t_unit=False):
-    filedic = {'mp2_E': 0, 'nds':0, 'cpu':0, 'wall': 0, 'err': True, 'esprops': None}
+    filedic = {'mp2_E': 0, 'nds':0, 'cpu':-1, 'wall': -1, 'err': True, 'esprops': None}
     esdict = {i: {'emmE-eV': 0, 'f': 0, 's2': 0, 'ifcoefs': []} for i in range(1, 4)}
 
     with open(totfile, "r") as fl:
