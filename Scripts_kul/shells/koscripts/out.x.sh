@@ -1,10 +1,10 @@
-#!/bin/zsh
+#!/usr/bin/env zsh
 ##
 # TODO switch grep to full sed
 rm -f keep
 keepname='keep'
 if [ $# -eq 0 ]; then # if no arguments: find pathern to match outputfile
-  cat $PWD/*.o?????? > $PWD/cat.o000000
+  cat $PWD/*.o[0-9]## > $PWD/cat.o000000
   name=$PWD/cat.o000000
 elif [ $# -eq 1 ]; then # if 1 arg: use this file to compress
   name=$1
@@ -19,7 +19,7 @@ grep -v "Copyright" keep > rem; mv rem keep
 grep -v "Institute" keep > rem; mv rem keep
 grep -v "Reserved" keep > rem; mv rem keep
 sed -i '/^[[:space:]]*$/d' keep 
-ls -l *.o?????? >> keep
+ls -l *.o[0-9]## >> keep
 if [ $keepname != 'keep' ]; then
   mv keep $keepname
 fi
