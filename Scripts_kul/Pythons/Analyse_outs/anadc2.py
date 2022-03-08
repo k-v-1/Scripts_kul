@@ -30,6 +30,8 @@ def init():
                         action="store_true")
     parser.add_argument("-t", "--time", help="Output time in seconds instead of hours.", action="store_true")
     parser.add_argument("-e", "--effi", help="Output efficiency instead of time (t_cpu/t_elapsed).", action="store_true")
+    parser.add_argument("-E", "--Etot", help="Output total energies of states.", action="store_true")
+    parser.add_argument("-T", "--TDM", help="Output total energies of states.", action="store_true")
     args = parser.parse_args()
     if args.effi:
         args.time = True
@@ -62,7 +64,7 @@ def init():
                 # if 'TURBOMOLE V7.1' not in fl.read():  # (faster than re.search)
                 if not re.search(r'ricc2 .* TURBOMOLE V7\.1',fl.read(),re.MULTILINE):
                     continue
-            main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi, roundnum=addspace)
+            main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi, roundnum=addspace, tote=args.Etot, tdm=args.TDM)
         except UnicodeError:
             continue
 
@@ -114,7 +116,7 @@ def init():
         exit(1)
 
 
-def main(infile, outname, long=False, t_unit=False, eff=False, roundnum=False):
+def main(infile, outname, long=False, t_unit=False, eff=False, roundnum=False, tote=False, tdm=False):
     with open(outname, 'a') as f:
         name = infile.parent.relative_to(Path.cwd())
         # name = infile.parent.parent.name
@@ -125,14 +127,22 @@ def main(infile, outname, long=False, t_unit=False, eff=False, roundnum=False):
             filedict['wall'] = round(filedict['cpu']/filedict['wall']/filedict['nds']*100,2)
         else:
             filedict['wall'] = round(filedict['wall'], 2-int(floor(log10(abs(filedict['wall'])))))
+        if tote:
+            csvw.writerow([name, filedict['mp2_E']])
+            [csvw.writerow([es, filedict['esprops'][es]['emmE-au']+filedict['mp2_E']]) for es in filedict['esprops']]
+            # csvw.writerow([name, *[es for es in filedict['esprops']]])
+            # csvw.writerow([filedict['mp2_E'], *[filedict['esprops'][es]['emmE-au']+filedict['mp2_E'] for es in filedict['esprops']]])
+        if tdm:
+            row1 = []
+            for es in filedict['esprops']:
+                esd = filedict['esprops'][es]
+                csvw.writerow([es, *[f'{ls[0]}{ls[1]}' for ls in esd['tdm']]])
+                csvw.writerow([es, *[ls[2] for ls in esd['tdm']]])
         if long:
             csvw.writerow([name, filedict['err'], filedict['wall'], filedict['mp2_E']])
             for es in filedict['esprops']:
-                row1 = [es]
                 esd = filedict['esprops'][es]
-                row1.append(esd['s2'])
-                row1.append(esd['emmE-eV'])
-                row1.append(esd['f'])
+                row1 = [es, esd['s2'], esd['emmE-eV'], esd['f']]
                 [row1.append(k) for k in esd['ifcoefs']]
                 csvw.writerow(row1)
         elif roundnum:
@@ -168,10 +178,10 @@ def dhms2time(d, h, m, s, unit=False):
 
 def start_ana(totfile, t_unit=False):
     filedic = {'mp2_E': 0, 'nds':0, 'cpu':-1, 'wall': -1, 'err': True, 'esprops': None}
-    esdict = {i: {'emmE-eV': 0, 'f': 0, 's2': 0, 'ifcoefs': []} for i in range(1, 4)}
+    esdict = {i: {'emmE-eV': 0, 'f': 0, 's2': 0, 'ifcoefs': [], 'tdm': []} for i in range(1, 4)}
 
     with open(totfile, "r") as fl:
-        cosmo, ifstart = False, False
+        cosmo, ifstart, tdm_start = False, False, False
         esnum, esnumc = 0, 0
         for line in fl.readlines():
             # nodes
@@ -187,22 +197,41 @@ def start_ana(totfile, t_unit=False):
                 #gs-energy
                 if filedic['mp2_E'] == 0:
                     mp2_match = re.search(r'^ {5}\*   Final MP2 energy {24}\: +([0-9.-]+) +\*', line)
-                if mp2_match is not None:
-                    filedic['mp2_E'] = float(mp2_match.group(1))
+                    if mp2_match is not None:
+                        filedic['mp2_E'] = float(mp2_match.group(1))
 
                 #energies, multis and osc strength
                 esmatch = re.search(r'^  \| +number, symmetry, multiplicity: +([0-9]+) a    ([0-9])', line)
                 if esmatch is not None:
                     esnum = int(esmatch.group(1))
                     esdict[esnum]['s2']=int(esmatch.group(2))
-                if esnum != 0:
-                    freqmatch = re.search(r'^  \| +frequency : +[0-9.-]+ a\.u\. +([0-9.-]+) e\.V\.', line)
-                    if freqmatch is not None:
-                        esdict[esnum]['emmE-eV']=float(freqmatch.group(1))
+                elif esnum != 0:
+                    freqmatch = re.search(r'^  \| +frequency : +([0-9.-]+) a\.u\. +([0-9.-]+) e\.V\.', line)
                     f_match = re.search(r'oscillator strength \(length gauge\) +: +([0-9.-]+)', line)
-                    if f_match is not None:
+                    dip_match = re.search(r'([xyz])diplen +[|] +[0-9.-]+[ |]+[0-9.-]+[ |]+([0-9.-]+)', line)
+                    if freqmatch is not None:
+                        esdict[esnum]['emmE-au'] = float(freqmatch.group(1))
+                        esdict[esnum]['emmE-eV'] = float(freqmatch.group(2))
+                    elif dip_match is not None:
+                        esdict[esnum]['tdm'].append([0, str(dip_match.group(1)), float(dip_match.group(2))])
+                    elif f_match is not None:
                         esdict[esnum]['f'] = float(f_match.group(1))
                         esnum = 0
+                #es-es-tdms
+                pair_match = re.search(r'Transition moments for pair +([0-9]+) .+ ([0-9]+) ', line)
+                if pair_match is not None:
+                    eses1 = int(pair_match.group(1))
+                    eses2 = int(pair_match.group(2))
+                    tdm_start = True
+                if tdm_start:
+                    dip2_match = re.search(r'([xyz])diplen +[0-9.-]+ +[0-9.-]+ +([0-9.-]+)', line)
+                    if dip2_match is not None:
+                        esdict[eses1]['tdm'].append([eses2, str(dip2_match.group(1)), dip2_match.group(2)])
+                        # esdict[eses1]['tdm'].append(eses2)
+                        # esdict[eses1]['tdm'].append(str(dip2_match.group(1)))
+                        # esdict[eses1]['tdm'].append(dip2_match.group(2))
+                        if str(dip2_match.group(1)) == 'z':
+                            tdm_start=False
 
             #ifcoefs: both gas and cosmo
             ifsmatch = re.search(r'type: RE0 +symmetry: a +state: +([0-9]+)', line)
