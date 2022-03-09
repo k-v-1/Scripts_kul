@@ -48,8 +48,10 @@ def init():
     # TODO: Check all files on content and determine like this what filename to use for data obtaining
 
     header = True
+    if args.onefig:
+        args.spec = True
     if args.Onefig:
-        args.Spec = True
+        args.Kicspec = True
     do_kicspec = {'spec':args.Kicspec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
     do_spec = {'spec':args.spec, 'unit':args.unit, 'onefig':args.onefig, 'axis': args.axis}
     def ratestr(rate):
@@ -74,8 +76,11 @@ def init():
                      f"{datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, " \
                      f"{ratestr(rate)}, {ratestr(datdic['rtsfsp'])}"
             print(prntln)
-        plt.legend()
-    plt.show()
+            # if plt.gca().get_legend_handles_labels() !=([],[]):
+            if args.Kicspec or args.spec:
+                plt.legend()
+    if args.Kicspec or args.spec:
+        plt.show()
 
 
 def getfl(folder, ext=''):
@@ -190,18 +195,18 @@ def genspec(specfile, unit='ev', axis=None, onefig=False):
         plt.figure('Abs-Emi', figsize=(4, 3))
     else:
         plt.figure(label, figsize=(4, 3))
-    matabs = np.genfromtxt(specfile, delimiter="")
-    matabs[:, 1] *= 1 / max(matabs[:, 1])
+    specmat = np.genfromtxt(specfile, delimiter="")
+    specmat[:, 1] *= 1 / max(specmat[:, 1])
     k = uconv[unit]
     if unit == 'nm':
-        matabs[:, 0] = np.reciprocal(matabs[:, 0], where=matabs[:, 0] != 0)
+        specmat[:, 0] = np.reciprocal(specmat[:, 0], where=specmat[:, 0] != 0)
         if axis is None:
             plt.axis([250, 950, 0, 1])
     if axis is not None:
         plt.axis([axis[0], axis[1], 0, 1])
-    matabs[:, 0] *= k
+    specmat[:, 0] *= k
     # if onefig:
-    plt.plot(matabs[:, 0], matabs[:, 1], linewidth=lnsz, alpha=0.8, label=label)  # abs
+    plt.plot(specmat[:, 0], specmat[:, 1], linewidth=lnsz, alpha=0.8, label=label)
     plt.xlabel(unit, fontsize=fntsz)
     # plt.ylabel('Intensity', fontsize=fntsz)
     plt.tight_layout()
@@ -217,7 +222,6 @@ def inf_main(flname, prop, specargs, kicspecargs):
     else:
         rt = '         '
     datdic['rtsfsp'] = '       '
-    print(specargs)
     if prop in ['IC', 'NR0']:
         plotfile = [y for y in flname.parent.glob('k??_vs_Ead_T?.dat')][0]
         datdic['rtsfsp'] = rts_from_spec(plotfile, datdic['Ead'] * 27.212, **kicspecargs)
