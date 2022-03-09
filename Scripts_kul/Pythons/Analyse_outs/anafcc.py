@@ -34,12 +34,15 @@ def init():
     parser.add_argument('folders', type=str, nargs='+',
                         help='Folders containing output files [and rate_vs_ead-file]')
     parser.add_argument('-e', '--ext', default='',type=str, help='extension for outputfiles (.out, .log, , ...)')
-    # parser.add_argument('-i', '--info', action='store_true', help='Show only in&output information')
-    # parser.add_argument('-a', '--axis', type=float, nargs=2, help='specify x-axis values', default=None)
-    parser.add_argument('-S', '--Spec', action='store_true', help='Show spectra for IC, NR0', default=False)
-    parser.add_argument('-O', '--Onefig', action='store_true', help='Spec: add all graphs from a dir in 1 fig', default=True)
-    parser.add_argument('-U', '--Unit', type=str.lower, help='Spec: choose eV, nm, rcm=cm-1', default='ev')
-    parser.add_argument('-P', '--Points', type=int, help='Spec: number of points for smoothing', default=10)
+    parser.add_argument('-s', '--spec', action='store_true', help='Show spectra for abs, emi', default=False)
+    parser.add_argument('-o', '--onefig', action='store_true', help='spec: add all graphs from a dir in 1 fig', default=False)
+    parser.add_argument('-u', '--unit', type=str.lower, help='spec: choose eV, nm, rcm=cm-1', default='ev')
+    parser.add_argument('-a', '--axis', type=float, nargs=2, help='spec: choose x-axis limits', default=None)
+
+    parser.add_argument('-K', '--Kicspec', action='store_true', help='Show spectra for IC, NR0', default=False)
+    parser.add_argument('-O', '--Onefig', action='store_true', help='KicSpec: add all graphs from a dir in 1 fig', default=False)
+    parser.add_argument('-U', '--Unit', type=str.lower, help='KicSpec: choose eV, nm, rcm=cm-1', default='ev')
+    parser.add_argument('-P', '--Points', type=int, help='KicSpec: number of points for smoothing', default=10)
     args = parser.parse_args()
 
     # TODO: Check all files on content and determine like this what filename to use for data obtaining
@@ -47,7 +50,8 @@ def init():
     header = True
     if args.Onefig:
         args.Spec = True
-    do_spec = {'spec':args.Spec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
+    do_kicspec = {'spec':args.Kicspec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
+    do_spec = {'spec':args.spec, 'unit':args.unit, 'onefig':args.onefig, 'axis': args.axis}
     def ratestr(rate):
         try:
             return f"{rate:.3e}"
@@ -65,13 +69,13 @@ def init():
             header = False
         for outfl, outprop in outlst:
             # print(outfl.parent.relative_to(Path.cwd()))
-            datdic, rate = inf_main(outfl, outprop, do_spec)
+            datdic, rate = inf_main(outfl, outprop, do_spec, do_kicspec)
             prntln = f"{outfl.parent.relative_to(Path.cwd())}, {(datdic['Ead'] * 27.212):.3f}, "\
                      f"{datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, " \
                      f"{ratestr(rate)}, {ratestr(datdic['rtsfsp'])}"
             print(prntln)
         plt.legend()
-        plt.show()
+    plt.show()
 
 
 def getfl(folder, ext=''):
@@ -142,9 +146,10 @@ def times(filepath):
     return float(p.readline().decode('utf8'))
 
 
-def rts_from_spec(filepath, ead, points=10, spec=True, unit='ev', onefig=False):  # todo: how to choose points?; #todo: Show graph?; .......
-    plotfile = [y for y in filepath.parent.glob('k??_vs_Ead_T?.dat')][0]
-    fomat = np.genfromtxt(plotfile)
+def rts_from_spec(datfile, ead, points=10, spec=True, unit='ev', onefig=False):  # todo: how to choose points?; #todo: Show graph?; .......
+    # plotfile = [y for y in filepath.parent.glob('k??_vs_Ead_T?.dat')][0]
+    label = str(datfile.parent.relative_to(Path.cwd()))
+    fomat = np.genfromtxt(datfile)
     y_smo = lts.smooth(fomat[:, 1], points)
     # fo_smo = fomat[:, 1]
     xval = lts.closest(fomat[:, 0], ead)
@@ -152,10 +157,9 @@ def rts_from_spec(filepath, ead, points=10, spec=True, unit='ev', onefig=False):
     try:
         ytestval = y_smo[list(fomat[:, 0]).index(xval) + 1]
     except IndexError:
-        print(
-            f'{filepath.parts[-1]}      ,kic-val on edge of plotted region? index =, {list(fomat[:, 0]).index(xval)}, {len(y_smo)}')
+        print(f'{label}      ,kic-val on edge of plotted region? index =, {list(fomat[:, 0]).index(xval)}, {len(y_smo)}')
         ytestval = y_smo[list(fomat[:, 0]).index(xval) - 1]
-    smoothmessage = f'{filepath.parts[-1]}      , SmoothingNotComplete!, {yval:0.2e}, {ytestval:0.2e}'
+    smoothmessage = f'{label}      , SmoothingNotComplete!, {yval:0.2e}, {ytestval:0.2e}'
     try:
         if math.log10(ytestval) - math.log10(yval) > 0.05:
             print(smoothmessage)
@@ -166,13 +170,12 @@ def rts_from_spec(filepath, ead, points=10, spec=True, unit='ev', onefig=False):
         xvals, yvals = fomat[:,0]*uconv[unit], fomat[:,1]
         yvals = np.array([math.log10(abs(max(1, i))) for i in yvals])
         y_smo = np.array([math.log10(abs(max(1, i))) for i in y_smo])
-        label = str(filepath.parent.relative_to(Path.cwd()))
         if onefig:
-            fig = plt.figure(1, figsize=[3,3])
+            fig = plt.figure('knr/kic', figsize=[4,3])
             plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
             plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, label=label)  # kic
         else:
-            fig = plt.figure(label, figsize=[3,3])
+            fig = plt.figure(label, figsize=[4,3])
             # returns log(kic), except if kic is < 1 (negative), then 0
             plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, color='k')  # kic
             plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
@@ -181,7 +184,30 @@ def rts_from_spec(filepath, ead, points=10, spec=True, unit='ev', onefig=False):
     return yval
 
 
-def inf_main(flname, prop, specargs):
+def genspec(specfile, unit='ev', axis=None, onefig=False):
+    label = str(specfile.parent.relative_to(Path.cwd()))
+    if onefig:
+        plt.figure('Abs-Emi', figsize=(4, 3))
+    else:
+        plt.figure(label, figsize=(4, 3))
+    matabs = np.genfromtxt(specfile, delimiter="")
+    matabs[:, 1] *= 1 / max(matabs[:, 1])
+    k = uconv[unit]
+    if unit == 'nm':
+        matabs[:, 0] = np.reciprocal(matabs[:, 0], where=matabs[:, 0] != 0)
+        if axis is None:
+            plt.axis([250, 950, 0, 1])
+    if axis is not None:
+        plt.axis([axis[0], axis[1], 0, 1])
+    matabs[:, 0] *= k
+    # if onefig:
+    plt.plot(matabs[:, 0], matabs[:, 1], linewidth=lnsz, alpha=0.8, label=label)  # abs
+    plt.xlabel(unit, fontsize=fntsz)
+    # plt.ylabel('Intensity', fontsize=fntsz)
+    plt.tight_layout()
+    # plt.savefig('/home/koen/un2/mmp/tmp.png')
+
+def inf_main(flname, prop, specargs, kicspecargs):
     datdic = getinp(flname)
     if prop in ['EMI', 'IC', 'NR0']:
         rt = rates(flname, prop)
@@ -190,10 +216,16 @@ def inf_main(flname, prop, specargs):
             print(f'Error: No rates in file? {flname.relative_to(Path.cwd())}')
     else:
         rt = '         '
+    datdic['rtsfsp'] = '       '
+    print(specargs)
     if prop in ['IC', 'NR0']:
-        datdic['rtsfsp'] = rts_from_spec(flname, datdic['Ead'] * 27.212, **specargs)
-    else:
-        datdic['rtsfsp'] = '       '
+        plotfile = [y for y in flname.parent.glob('k??_vs_Ead_T?.dat')][0]
+        datdic['rtsfsp'] = rts_from_spec(plotfile, datdic['Ead'] * 27.212, **kicspecargs)
+    elif prop in ['OPA', 'EMI'] and specargs['spec']:
+        plotfile = [y for y in flname.parent.glob('spec_Int_T?.dat')][0]
+        r = dict(specargs)
+        del r['spec']
+        genspec(plotfile, **r)
 
     if datdic['isgauss'] == '.f.':
         datdic['BroadenType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', '-', '-'
