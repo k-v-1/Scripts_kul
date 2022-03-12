@@ -152,7 +152,6 @@ def times(filepath):
 
 
 def rts_from_spec(datfile, ead, points=10, spec=True, unit='ev', onefig=False):  # todo: how to choose points?; #todo: Show graph?; .......
-    # plotfile = [y for y in filepath.parent.glob('k??_vs_Ead_T?.dat')][0]
     label = str(datfile.parent.relative_to(Path.cwd()))
     fomat = np.genfromtxt(datfile)
     y_smo = lts.smooth(fomat[:, 1], points)
@@ -223,13 +222,15 @@ def inf_main(flname, prop, specargs, kicspecargs):
         rt = '         '
     datdic['rtsfsp'] = '       '
     if prop in ['IC', 'NR0']:
-        plotfile = [y for y in flname.parent.glob('k??_vs_Ead_T?.dat')][0]
-        datdic['rtsfsp'] = rts_from_spec(plotfile, datdic['Ead'] * 27.212, **kicspecargs)
+        plotfile = [y for y in flname.parent.glob('k??_vs_Ead_T?.dat')]
+        if plotfile != []:
+            datdic['rtsfsp'] = rts_from_spec(plotfile[0], datdic['Ead'] * 27.212, **kicspecargs)
     elif prop in ['OPA', 'EMI'] and specargs['spec']:
-        plotfile = [y for y in flname.parent.glob('spec_Int_T?.dat')][0]
-        r = dict(specargs)
-        del r['spec']
-        genspec(plotfile, **r)
+        plotfile = [y for y in flname.parent.glob('spec_Int_T?.dat')]
+        if plotfile != []:
+            r = dict(specargs)
+            del r['spec']
+            genspec(plotfile[0], **r)
 
     if datdic['isgauss'] == '.f.':
         datdic['BroadenType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', '-', '-'
