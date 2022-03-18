@@ -183,7 +183,7 @@ def rts_from_spec(datfile, ead, points=10, spec=True, unit='ev', onefig=False): 
             # returns log(kic), except if kic is < 1 (negative), then 0
             plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, color='k')  # kic
             plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
-        plt.plot(ead, math.log10(yval), 'X', color='k')
+        plt.plot(ead, math.log10(abs(max(1, yval))), 'X', color='k')
         fig.tight_layout()
     return yval
 
