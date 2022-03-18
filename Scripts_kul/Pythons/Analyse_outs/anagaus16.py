@@ -98,7 +98,7 @@ def main(filename, outname, fc=False, t_unit=False, eff=False):
         name = infile.name
         print(name)  # , filedict)
         filedict = start_ana(infile, t_unit)
-        if eff:
+        if eff and filedict['genprops']['time'] != 0:
             filedict['genprops']['time'] = round(filedict['genprops']['cpu']/filedict['genprops']['time'],2)
         row1 = [name, filedict['genprops']['o/f'], filedict['genprops']['time'], filedict['genprops']['imag']]
         if filedict['gsprops'] is not None:
