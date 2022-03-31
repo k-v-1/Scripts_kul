@@ -8,13 +8,15 @@ import math
 import subprocess
 import littlescripts as lts
 import sys
+import pandas as pd
 
 ############
 # init: args from terminal: dirs of outputfiles
 #   --> get_fl
 #   --> inf_main
+#   ==> converts dict do dataframe and print output
 # get_fl: folder -> list of valid output files
-# inf_main: file -> datdic + rate
+# inf_main: file -> datdic
 #   --> getinp
 #   --> rates
 #   --> rts_from_spec
@@ -34,52 +36,69 @@ def init():
     parser.add_argument('folders', type=str, nargs='+',
                         help='Folders containing output files [and rate_vs_ead-file]')
     parser.add_argument('-e', '--ext', default='',type=str, help='extension for outputfiles (.out, .log, , ...)')
+    parser.add_argument('-l', '--long', action='store_true', help='long output', default=False)
+    parser.add_argument('-L', '--extralong', action='store_true', help='extra long output', default=False)
+    parser.add_argument('-r', '--readable', action='store_true', help='readable output', default=False)
+
     parser.add_argument('-s', '--spec', action='store_true', help='Show spectra for abs, emi', default=False)
     parser.add_argument('-o', '--onefig', action='store_true', help='spec: add all graphs from a dir in 1 fig', default=False)
     parser.add_argument('-u', '--unit', type=str.lower, help='spec: choose eV, nm, rcm=cm-1', default='ev')
     parser.add_argument('-a', '--axis', type=float, nargs=2, help='spec: choose x-axis limits', default=None)
 
-    parser.add_argument('-K', '--Kicspec', action='store_true', help='Show spectra for IC, NR0', default=False)
+    parser.add_argument('-I', '--Icspec', action='store_true', help='Show spectra for IC, NR0', default=False)
     parser.add_argument('-O', '--Onefig', action='store_true', help='KicSpec: add all graphs from a dir in 1 fig', default=False)
     parser.add_argument('-U', '--Unit', type=str.lower, help='KicSpec: choose eV, nm, rcm=cm-1', default='ev')
     parser.add_argument('-P', '--Points', type=int, help='KicSpec: number of points for smoothing', default=10)
     args = parser.parse_args()
 
-    # TODO: Check all files on content and determine like this what filename to use for data obtaining
-
-    header = True
     if args.onefig:
         args.spec = True
     if args.Onefig:
-        args.Kicspec = True
-    do_kicspec = {'spec':args.Kicspec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
+        args.Icspec = True
+    do_kicspec = {'spec':args.Icspec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
     do_spec = {'spec':args.spec, 'unit':args.unit, 'onefig':args.onefig, 'axis': args.axis}
-    def ratestr(rate):
-        try:
-            return f"{rate:.3e}"
-        except ValueError:
-            return rate
 
+    list_of_dicts = []
     for dirstr in args.folders:
         drg = Path(dirstr).expanduser().absolute()
         if not drg.is_dir():
             continue  # TODO: More checks!
         print(dirstr)
         outlst = getfl(drg, ext=args.ext)
-        if header:
-            print('name, Ead (eV), l/g, FWHM (rcm), rate (s-1), rate_spec')
-            header = False
         for outfl, outprop in outlst:
-            # print(outfl.parent.relative_to(Path.cwd()))
-            datdic, rate = inf_main(outfl, outprop, do_spec, do_kicspec)
-            prntln = f"{outfl.parent.relative_to(Path.cwd())}, {(datdic['Ead'] * 27.212):.3f}, "\
-                     f"{datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, " \
-                     f"{ratestr(rate)}, {ratestr(datdic['rtsfsp'])}"
-            print(prntln)
+            datdic = inf_main(outfl, outprop, do_spec, do_kicspec)
+            datdic['name'] = outfl.parent.relative_to(Path.cwd())
+            list_of_dicts.append(datdic)
             # if plt.gca().get_legend_handles_labels() !=([],[]):
-            if args.Kicspec or args.spec:
+            if args.Icspec or args.spec:
                 plt.legend()
-    if args.Kicspec or args.spec:
+
+    df = pd.DataFrame(list_of_dicts)
+    df['Temp'] = df['Temp'].map('{:.0f}'.format)
+    df['points'] = df['points'].map('{:.0f}'.format)
+    df['tmax'] = df['tmax'].map('{:.0f}'.format)
+    df['dt'] = df['dt'].map('{:.1f}'.format)
+    df['Ead'] = df['Ead'].map('{:.2f}'.format)
+    df['FWHM'] = df['FWHM'].map('{:.1e}'.format)
+    df['brexp'] = df['brexp'].map('{:.1e}'.format)
+
+    print('Ead in eV; FWHM in rcm')
+    if args.readable:
+        if args.long:
+            prtstr = df[['name', 'rtsfsp', 'rt', 'Ead', 'Temp', 'BrType', 'FWHM']].to_string(index=False)
+        elif args.extralong:
+            prtstr = df[['name', 'rtsfsp', 'rt', 'Ead', 'Temp', 'BrType', 'FWHM', 'points', 'dt', 'tmax']].to_string(index=False)
+        else:
+            prtstr = df[['name', 'rtsfsp', 'Ead']].to_string(index=False)
+        print(re.sub(r"([a-zA-Z0-9:/-]) ", r"\1, ", prtstr))  # re.MULTILINE stops replacing after 8 hits
+    else:
+        if args.long:
+            print(df[['name', 'rtsfsp', 'rt', 'Ead', 'Temp', 'BrType', 'FWHM']].to_csv(index=False))
+        elif args.extralong:
+            print(df[['name', 'rtsfsp', 'rt', 'Ead', 'Temp', 'BrType', 'FWHM', 'points', 'dt', 'tmax']].to_csv(index=False))
+        else:
+            print(df[['name', 'rtsfsp', 'Ead']].to_csv(index=False))
+    if args.Icspec or args.spec:
         plt.show()
 
 
@@ -98,22 +117,22 @@ def getfl(folder, ext=''):
     return foutlst
 
 
-def getinp(filepath):  # FWHM in a.u.
+def getinp(filepath):  # FWHM in a.u., Ead in eV
     script = ''
-    infdic = {'Temp': -math.inf, 'Ead': -math.inf, 'tmax:': -math.inf, 'dt': -math.inf, 'points': -math.inf,
-                'isgauss': '-', 'BroadenType': '-', 'FWHM': -math.inf, 'Broadenfunc': '-'}
+    infdic = {'Temp': math.nan, 'Ead': math.nan, 'tmax': math.nan, 'dt': math.nan, 'points': math.nan,
+                'isgauss': '-', 'BrType': '-', 'FWHM': math.nan} #, 'Broadenfunc': '-'}
     script = """
                 cat <<'END' | sh | xargs echo
                 fl=%s
                 grep -F "Temperature" $fl | awk '{print "Temp",$3}'
-                grep -F -A1 "ADIABATIC ENERGY" $fl | tail -n1 | awk '{print "Ead", 0.0367484*$1}'
+                grep -F -A1 "ADIABATIC ENERGY" $fl | tail -n1 | awk '{print "Ead", $1}' #Not converted to au anymore!
                 # grep "Total time" $fl | awk '{print "tmax",41.341373*$4}'
                 # grep "Time step" $fl | awk '{print "dt",41.341373*$5}'
                 # grep "data points" $fl | awk '{print "points",$5}'
                 grep -F "tfin  =" $fl | awk '{print "tmax",41.341373*$3}'
                 grep -F "dt    =" $fl | awk '{print "dt",41.341373*$3}'
                 grep -F "ntime =" $fl | awk '{print "points",$3}'
-                grep -F "Broad. function" $fl | awk '{print "BroadenType",$4}'
+                grep -F "Broad. function" $fl | awk '{print "BrType",$4}'
                 grep -E "HWHM {9}=" $fl | awk '{print "FWHM",2*0.0367485*$3}'
                 grep -F "Broad. exponent" $fl | awk '{print "brexp", $4}'
 END
@@ -211,20 +230,24 @@ def genspec(specfile, unit='ev', axis=None, onefig=False):
     plt.tight_layout()
     # plt.savefig('/home/koen/un2/mmp/tmp.png')
 
-def inf_main(flname, prop, specargs, kicspecargs):
+
+def inf_main(flname, prop, specargs, kicspecargs):  # FWHM in rcm, Ead in eV
     datdic = getinp(flname)
     if prop in ['EMI', 'IC', 'NR0']:
         rt = rates(flname, prop)
         if rt is None:
-            rt = '  ---  '
+            rt = '    ---'
             print(f'Error: No rates in file? {flname.relative_to(Path.cwd())}')
+        else:
+            rt = f'{rt:.2e}'
     else:
-        rt = '         '
-    datdic['rtsfsp'] = '       '
+        rt = '       /'
+    datdic['rt'] = rt
+    datdic['rtsfsp'] = '      /'
     if prop in ['IC', 'NR0']:
         plotfile = [y for y in flname.parent.glob('k??_vs_Ead_T?.dat')]
         if plotfile != []:
-            datdic['rtsfsp'] = rts_from_spec(plotfile[0], datdic['Ead'] * 27.212, **kicspecargs)
+            datdic['rtsfsp'] = f'{rts_from_spec(plotfile[0], datdic["Ead"], **kicspecargs):.2e}'
     elif prop in ['OPA', 'EMI'] and specargs['spec']:
         plotfile = [y for y in flname.parent.glob('spec_Int_T?.dat')]
         if plotfile != []:
@@ -233,20 +256,20 @@ def inf_main(flname, prop, specargs, kicspecargs):
             genspec(plotfile[0], **r)
 
     if datdic['isgauss'] == '.f.':
-        datdic['BroadenType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', '-', '-'
-    if re.search('LOR', datdic['BroadenType']):  # more exact fwhm
-        datdic['FWHM'] = datdic['brexp'] * 2
-    elif re.search('GAU', datdic['BroadenType']):
-        datdic['FWHM'] = 2 * math.sqrt(
+        datdic['BrType'], datdic['FWHM'], datdic['Broadenfunc'] = '-', math.nan, math.nan
+    if re.search('LOR', datdic['BrType']):  # more exact fwhm
+        datdic['FWHM'] = datdic['brexp'] * 2 * 219474
+    elif re.search('GAU', datdic['BrType']):
+        datdic['FWHM'] = 2 * 219474 * math.sqrt(
             2 * datdic['brexp'] / (math.sqrt(2 * math.log10(2))))  # todo: test this expression
-    return datdic, rt
-    # return datdic['Ead'] * 27.212,datdic['BroadenType'],  datdic['FWHM'] * 219474, rt, datdic['rtsfsp']
-
-    # prntln = f"{flname.parts[-1]}, {(datdic['Ead'] * 27.212):.3f}, {datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, " \
-    #          f"{rt:.3e}, {datdic['rtsfsp']:.3e}"
-    # if str(datdic['rtsfsp'])[0:2] == str(rt)[0:2]:
-    #     prntln = prntln.rsplit(' ', 1)[0]
+    return datdic
 
 
 if __name__ == '__main__':
     init()
+
+# return datdic['Ead'] * 27.212,datdic['BroadenType'],  datdic['FWHM'] * 219474, rt, datdic['rtsfsp']
+# prntln = f"{flname.parts[-1]}, {(datdic['Ead'] * 27.212):.3f}, {datdic['BroadenType'][0:3]}, {(datdic['FWHM'] * 219474):.2e}, " \
+#          f"{rt:.3e}, {datdic['rtsfsp']:.3e}"
+# if str(datdic['rtsfsp'])[0:2] == str(rt)[0:2]:
+#     prntln = prntln.rsplit(' ', 1)[0]
