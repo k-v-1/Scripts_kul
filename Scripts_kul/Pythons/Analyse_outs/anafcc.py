@@ -247,6 +247,8 @@ def inf_main(flname, prop, specargs, kicspecargs):  # FWHM in rcm, Ead in eV
     if prop in ['IC', 'NR0']:
         plotfile = [y for y in flname.parent.glob('k??_vs_Ead_T?.dat')]
         if plotfile != []:
+            if len(plotfile) > 1:
+                print(f'Warning: more than one k??_vs_Ead_T?.dat-file found!, using: {plotfile[0]}')
             datdic['rtsfsp'] = f'{rts_from_spec(plotfile[0], datdic["Ead"], **kicspecargs):.2e}'
     elif prop in ['OPA', 'EMI'] and specargs['spec']:
         plotfile = [y for y in flname.parent.glob('spec_Int_T?.dat')]
