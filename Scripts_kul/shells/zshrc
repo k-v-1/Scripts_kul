@@ -89,7 +89,13 @@ PS1='%(?.%F{green}√.%F{red}?%?)%f %F{yellow}SET2%f%B%F{cyan}${"$(spwd)"//\/h\/
 ls
 
 stty -ixon
-source /home/u0133458/.config/broot/launcher/bash/br
+HOST_IP=$(host `hostname` | grep -oP '(\s)\d+(\.\d+){3}' | tail -1 | awk '{ print $NF }' | tr -d '\r')
+export LIBGL_ALWAYS_INDIRECT=1
+export DISPLAY=$HOST_IP:0.0
+export NO_AT_BRIDGE=1
+export PULSE_SERVER=tcp:$HOST_IP
+
+#source /home/u0133458/.config/broot/launcher/bash/br
 #~/.testshift.sh
 
 # >>> conda initialize >>>
@@ -98,11 +104,11 @@ source /home/u0133458/.config/broot/launcher/bash/br
 #if [ $? -eq 0 ]; then
 #    eval "$__conda_setup"
 #else
-    if [ -f "/home/u0133458/anaconda3/etc/profile.d/conda.sh" ]; then
-        . "/home/u0133458/anaconda3/etc/profile.d/conda.sh"
-    else
-        export PATH="/home/u0133458/anaconda3/bin:$PATH"
-    fi
+#    if [ -f "/home/u0133458/anaconda3/etc/profile.d/conda.sh" ]; then
+#        . "/home/u0133458/anaconda3/etc/profile.d/conda.sh"
+#    else
+#        export PATH="/home/u0133458/anaconda3/bin:$PATH"
+#    fi
 #fi
 #unset __conda_setup
 # <<< conda initialize <<<
