@@ -1,6 +1,6 @@
 ##
 # adding the #s for color, no idea why this works :p
-export SCRPTS=/home/u0133458/PycharmProjects/Scripts_kul
+export SCRPTS=~/.sk/Scripts_kul
 alias ls='ls --color=auto'
 alias l=ls
 alias ll='ls -lh'
@@ -20,11 +20,11 @@ alias rsyng='rsync -auvh --exclude="*.chk" --exclude="*.fchk"'
 alias rsycf='rsync -auvh --exclude="*.chk" --exclude="*.fchk"'
 alias rsynh='rsync -auvh --exclude="*.chk" --progress'
 alias rsyc='rsync -auvh --exclude="*.chk" --progress'
-alias ct1='sshfs t1:/user/leuven/331/vsc33143 ~/sftp/t1/home;sshfs t1:/data/leuven/331/vsc33143 ~/sftp/t1/data; cs ~/sftp/t1/home'
-alias ct2='sshfs t2:/user/leuven/331/vsc33143 ~/sftp/t2/home;sshfs t2:/data/leuven/331/vsc33143 ~/sftp/t2/data; cs ~/sftp/t2/home'
-alias cko="sshfs : ~/sftp/ko -o ssh_command='ssh t2 -t ssh ko'; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"
-alias cko0="sshfs : ~/sftp/ko -o ssh_command='ssh t2 -t ssh ko'; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls; tmux split-window -h 'ssh t2 -t ssh ko'"
-alias cko1="sshfs ko: ~/sftp/ko; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"
+alias ct1='sshfs t1:/user/leuven/331/vsc33143 ~/sftp/t1/home -o allow_other,default_permissions;sshfs t1:/data/leuven/331/vsc33143 ~/sftp/t1/data -o allow_other,default_permissions; cs ~/sftp/t1/home'
+alias ct2='sshfs t2:/user/leuven/331/vsc33143 ~/sftp/t2/home -o allow_other,default_permissions;sshfs t2:/data/leuven/331/vsc33143 ~/sftp/t2/data -o allow_other,default_permissions; cs ~/sftp/t2/home'
+alias cko="sshfs : ~/sftp/ko -o ssh_command='ssh t2 -t ssh ko' -o allow_other; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"
+alias cko0="sshfs : ~/sftp/ko -o ssh_command='ssh t2 -t ssh ko' -o allow_other,default_permissions; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls; tmux split-window -h 'ssh t2 -t ssh ko'"
+alias cko1="sshfs ko: ~/sftp/ko -o allow_other,default_permissions; source ~/.koscripts/ko_aliases; cd ~/sftp/ko; ls"
 alias alko="source ~/.koscripts/ko_aliases"
 
 alias anagaus='python3 $SCRPTS/Pythons/Analyse_outs/anagaus16.py'
