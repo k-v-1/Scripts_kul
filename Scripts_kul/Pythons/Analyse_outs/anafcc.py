@@ -30,6 +30,8 @@ uconv = {'nm': 1239.849, 'rcm': 8065.5, 'cm-1': 8065.5, 'ev': 1}
 fntsz = 10
 lnsz = 0.8
 
+#TODO dt and tmax is wrong? (probably unit error)
+
 
 def init():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -253,6 +255,8 @@ def inf_main(flname, prop, specargs, kicspecargs):  # FWHM in rcm, Ead in eV
     elif prop in ['OPA', 'EMI'] and specargs['spec']:
         plotfile = [y for y in flname.parent.glob('spec_Int_T?.dat')]
         if plotfile != []:
+            if len(plotfile) > 1:
+                print(f'Warning: more than one spec_Int_T?.dat-file found!, using: {plotfile[0]}')
             r = dict(specargs)
             del r['spec']
             genspec(plotfile[0], **r)

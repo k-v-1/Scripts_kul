@@ -20,6 +20,9 @@ def init():
             print(f'Error: {fchkfl} not found', file=sys.stderr)
             continue
         gnat, gatnums, gcoords, gatweight, hes_full = get_gaus(fchkfl)
+        if np.array(hes_full).size == 0:
+            print(f'{flstr} no hessian found, not a correct fchk-file?', file=sys.stderr)
+            continue
 
         # writing orca .hess
 
@@ -35,6 +38,7 @@ def init():
 
 def get_gaus(fchk):  # get information from g16 fchk-file.
     nat=0
+    atnums, coords, atweight, hes_full = [], [], [], []
     n3 = 0
     with open(fchk, "r") as f:
         for line in f:  # Don't use f.readlines here, otherwise readline cannot be nested?
@@ -47,17 +51,14 @@ def get_gaus(fchk):  # get information from g16 fchk-file.
             if natstr is not None:
                 nat = int(natstr.group(1))
             if atnumstr is not None:
-                atnums = []
                 for _ in range(ceil(int(atnumstr.group(1))/6)):
                     for value in f.readline().strip().split():
                         atnums.append(int(value))
             if coordstr is not None:
-                coords = []
                 for _ in range(ceil(int(coordstr.group(1))/5)):
                     for value in f.readline().strip().split():
                         coords.append(float(value))
             if atweightstr is not None:
-                atweight = []
                 for _ in range(ceil(int(atweightstr.group(1))/5)):
                     for value in f.readline().strip().split():
                         atweight.append(float(value))

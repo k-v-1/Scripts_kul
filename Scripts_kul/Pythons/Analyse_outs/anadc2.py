@@ -15,6 +15,7 @@ init --> checks files, inits csv-file
         start_ana --> analyses outputfile
                     = nodes, energy, time, error, multiplicity, osc. strength, orbital coefs, ...
 """
+#very meta-stable, only works on specific single point adc(2) calculations
 
 def init():
     parser = ArgumentParser()
@@ -61,8 +62,8 @@ def init():
     for flname in fls:
         try:
             with open(flname, 'r') as fl:
-                # if 'TURBOMOLE V7.1' not in fl.read():  # (faster than re.search)
-                if not re.search(r'ricc2 .* TURBOMOLE V7\.1',fl.read(),re.MULTILINE):
+                # if not 'TURBOMOLE V7.1' not in fl.read():  # (faster than re.search)
+                if not re.search(r'ricc2 .* TURBOMOLE V7\.1', fl.read(2000), re.MULTILINE):
                     continue
             main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi, roundnum=addspace, tote=args.Etot, tdm=args.TDM)
         except UnicodeError:

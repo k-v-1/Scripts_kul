@@ -33,6 +33,7 @@ alias anadc2='python3 $SCRPTS/Pythons/Analyse_outs/anadc2.py'
 alias fmspec='python3 $SCRPTS/Pythons/Analyse_outs/fcc_mmp_spec.py 2> >(grep -v "Gtk-WARNING" >&2)'
 alias fmcomp='python3 $SCRPTS/Pythons/Analyse_outs/fcc_mmp_comp.py 2> >(grep -v "Gtk-WARNING" >&2)'
 alias i2j='python3 $SCRPTS/Pythons/Inscripts/coordscripts.py'
+alias gaus2orca='python3 $SCRPTS/Pythons/Inscripts/gaus2orca.py'
 alias avo='. $SCRPTS/shells/avo.sh'
 alias anaclr=$SCRPTS/shells/clr.sh
 alias fcc=~/.fcclasses/main/fcclasses3
