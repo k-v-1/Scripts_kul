@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from littlescripts import is_int
 
 atnum2sym = {1: 'H',
              2: 'He',
@@ -274,7 +275,7 @@ def xyz2dal(file, **basinfo):
         startval = basnf[1][i] + 1
 
     outfile = file.with_suffix('.dal')
-    filetemp = outfile.parent[0] / "temporaryyy.temp"
+    filetemp = outfile.parent / "temporaryyy.temp"
     with open(filetemp, "wt") as ftemp:
         with open(file, "rt") as gin:
             element = ['False']
@@ -282,20 +283,22 @@ def xyz2dal(file, **basinfo):
             j = 0  # runs over all atoms each element
             lsum = []
             for line in gin:
+                if is_int(line.split()[0]):  # xyz format with title
+                    next(gin)
+                    continue
                 try:
                     if line.split()[0] != element[-1]:
-                        if element != 'False':
-                            lsum.append(j)
-                        k = k + 1
+                        lsum.append(j)
+                        k += 1
                         j = 0
                         element.append(line.split()[0])
                     ftemp.write(line)
-                    j = j + 1
+                    j += 1
                 except IndexError:
                     continue
             lsum.append(j)
             lsum.append(k)
-            print(lsum)
+            print(lsum)  # list: [0 (from elem=False, serves as test), number of first elem, number of second elem, ..., Amount of differen elements]
             print(element)
 
     with open(filetemp, "rt") as ftemp:
