@@ -39,3 +39,10 @@ def tail(f, n):
     return t
 
 
+def is_int(n):
+    try:
+        float(n)
+    except ValueError:
+        return False
+    else:
+        return float(n).is_integer()
