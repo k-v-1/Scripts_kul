@@ -60,6 +60,7 @@ def init():
     if csvname.is_file():
         with open(csvname, 'r+') as csvfile:
             content = csvfile.read()
+            csvfile.truncate(0)  # gets rid of strange error if a lot of files are used (last line got partially repeated after writing 'content' again)
             csvfile.seek(0, 0)
             csvfile.write('name, o/f, time, imag, gse/ese, zpe, esopt, emmE-eV, f, ifweights\n' + content)
         if args.verbose:
