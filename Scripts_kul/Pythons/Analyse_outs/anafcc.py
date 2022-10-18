@@ -51,13 +51,14 @@ def init():
     parser.add_argument('-O', '--Onefig', action='store_true', help='KicSpec: add all graphs from a dir in 1 fig', default=False)
     parser.add_argument('-U', '--Unit', type=str.lower, help='KicSpec: choose eV, nm, rcm=cm-1', default='ev')
     parser.add_argument('-P', '--Points', type=int, help='KicSpec: number of points for smoothing', default=10)
+    parser.add_argument('-A', '--Axis', type=float, nargs=2, help='KicSpec: choose x-axis limits', default=None)
     args = parser.parse_args()
 
     if args.onefig:
         args.spec = True
     if args.Onefig:
         args.Icspec = True
-    do_kicspec = {'spec':args.Icspec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points}
+    do_kicspec = {'spec':args.Icspec, 'unit':args.Unit, 'onefig':args.Onefig, 'points':args.Points, 'axis': args.Axis}
     do_spec = {'spec':args.spec, 'unit':args.unit, 'onefig':args.onefig, 'axis': args.axis}
 
     list_of_dicts = []
@@ -172,7 +173,7 @@ def times(filepath):
     return float(p.readline().decode('utf8'))
 
 
-def rts_from_spec(datfile, ead, points=10, spec=True, unit='ev', onefig=False):  # todo: how to choose points?; #todo: Show graph?; .......
+def rts_from_spec(datfile, ead, points=10, spec=True, unit='ev', onefig=False, axis=None):  # todo: how to choose points?; #todo: Show graph?; .......
     label = str(datfile.parent.relative_to(Path.cwd()))
     fomat = np.genfromtxt(datfile)
     y_smo = lts.smooth(fomat[:, 1], points)
@@ -204,6 +205,8 @@ def rts_from_spec(datfile, ead, points=10, spec=True, unit='ev', onefig=False): 
             # returns log(kic), except if kic is < 1 (negative), then 0
             plt.plot(xvals, yvals, linewidth=lnsz, alpha=0.8, color='k')  # kic
             plt.plot(xvals, y_smo, linewidth=lnsz, alpha=0.5, color='r')  # smooth
+        if axis is not None:
+            plt.xlim([axis[0], axis[1]])
         plt.plot(ead, math.log10(abs(max(1, yval))), 'X', color='k')
         fig.tight_layout()
     return yval
