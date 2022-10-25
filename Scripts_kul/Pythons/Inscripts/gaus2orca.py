@@ -19,7 +19,7 @@ def init():
         if not fchkfl.is_file():
             print(f'Error: {fchkfl} not found', file=sys.stderr)
             continue
-        gnat, gatnums, gcoords, gatweight, hes_full = get_gaus(fchkfl)
+        gnat, gatnums, gcoords, gatweight, hes_full, gfreqs, gmodes = get_gaus(fchkfl)
         if np.array(hes_full).size == 0:
             print(f'{flstr} no hessian found, not a correct fchk-file?', file=sys.stderr)
             continue
@@ -29,8 +29,8 @@ def init():
         with open(orcfl, "w") as f:  # only here opening as w, all others should be a!
             f.write('$orca_hessian_file\n \n$act_atom\n 0\n \n$act_coord\n 0\n \n$act_energy\n   0.000000\n\n')
         orc_hes(orcfl,hes_full)
-        # orc_freq(orcfl,gfreqs)
-        # orc_nm(orcfl,gvibs)
+        orc_freq(orcfl,gfreqs)
+        orc_nm(orcfl,gmodes)
         orc_coord(orcfl, gatnums, gatweight, gcoords)
         with open(orcfl, 'a') as f:
             f.write('\n\n$end\n\n')
@@ -47,7 +47,8 @@ def get_gaus(fchk):  # get information from g16 fchk-file.
             coordstr = re.search(r'^Current cartesian coordinates +R +N= +([0-9]+)', line) # should be 3*nat
             atweightstr = re.search(r'^Real atomic weights +R +N= +([0-9+]+)',line)
             cfcstr = re.search(r'^Cartesian Force Constants +R +N= +([0-9]+)', line)
-            # vibstr = re.search(r'^Vib-Modes +R +N= +([0-9]+)', line) # should be 9*nat*(nat-2)
+            freqstr = re.search(r'^Vib-E2 +R +N= +([0-9]+)', line)  # should be 14*nvib = 14*(3*nat-6), only first 3n-6 are the freqs, the rest is masses, force constants, ir...
+            vibstr = re.search(r'^Vib-Modes +R +N= +([0-9]+)', line) # should be 9*nat*(nat-2)
             if natstr is not None:
                 nat = int(natstr.group(1))
             if atnumstr is not None:
@@ -64,13 +65,22 @@ def get_gaus(fchk):  # get information from g16 fchk-file.
                         atweight.append(float(value))
 
             # TODO hopefully not needed
+            # Assuming 0 for first 6 modes..?..
+            if freqstr is not None:
+                freqs = [0]*6
+                for _ in range(ceil(int(freqstr.group(1))/(14*5))):
+                    for value in f.readline().strip().split():
+                        freqs.append(float(value))
+                freqs = freqs[0:3*nat]
+
             # Not used, since g16 is not using full 3n*3n, so shape can be 3n*3n-6 or reversed...
-            # if vibstr is not None:
-            #     vibs=[]
-            #     for _ in range(ceil(int(vibstr.group(1))/5)-1):
-            #         for value in f.readline().strip().split():
-            #             vibs.append(value)
-            #     vibmat = np.array(vibs).reshape(())
+            # Assuming 0 for first 6 modes..?..
+            if vibstr is not None:
+                vibs=[0] * 6 * 3 * nat
+                for _ in range(ceil(int(vibstr.group(1))/5)):
+                    for value in f.readline().strip().split():
+                        vibs.append(float(value))
+                vibmat = np.array(vibs).reshape((3*nat, 3*nat)).transpose()
 
             if cfcstr is not None:
                 row = 0  # row index
@@ -91,7 +101,9 @@ def get_gaus(fchk):  # get information from g16 fchk-file.
     # print(coords)
     # print(atweight)
     # print(hes_full)
-    return nat, atnums, coords, atweight, hes_full
+    # print(freqs)
+    # print(vibmat)
+    return nat, atnums, coords, atweight, hes_full, freqs, vibmat
 
 
 def orc_coord(output, atnumlst, atweightlst, coordlst):  # append BOHR-coordinates to output. Orca format. All inputs in lists.
@@ -122,6 +134,30 @@ def orc_hes(output,hes_full):  # append full hessian matrix to output, including
             for j in range(n3):  # write 3n x 5 block: number of row + hessian elements of block
                 f.write(f' {j:d}     ')
                 [f.write(f' {t:.8E}   ') for t in hes_full[j,5*i:5*i+m5]]
+                f.write('\n')
+        f.write('\n')
+
+
+def orc_freq(output, freqlist):
+    with open(output, 'a') as f:
+        f.write(f'$vibrational_frequencies\n{len(freqlist)}\n')
+        for i in range(len(freqlist)):
+            f.write(f'  {i}   {freqlist[i]:.6f}\n')
+        f.write('\n')
+
+def orc_nm(output, modmat):
+    n3 = len(modmat)
+    with open(output, "a") as f:
+        f.write(f'$normal_modes\n{n3} {n3}\n')
+        nrows = ceil(n3/5)  # number of 3n x 5 segments, including last one
+        for i in range(nrows):  # first segment is 0
+            m5 = min(5, n3-5*i)  # this is 5, except if line is incomplete (last line)
+
+            [f.write(f'                {t+5*i:d}') for t in range(m5)]  # write numbering line
+            f.write("\n")
+            for j in range(n3):  # write 3n x 5 block: number of row + modes elements of block
+                f.write(f' {j:d}     ')
+                [f.write(f' {t:.8E}   ') for t in modmat[j,5*i:5*i+m5]]
                 f.write('\n')
         f.write('\n')
 

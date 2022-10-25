@@ -274,7 +274,7 @@ def xyz2dal(file, **basinfo):
         basdic.update({j: basnf[0][i] for j in range(startval, basnf[1][i] + 1)})
         startval = basnf[1][i] + 1
 
-    outfile = file.with_suffix('.dal')
+    outfile = file.with_suffix('.mol')
     filetemp = outfile.parent / "temporaryyy.temp"
     with open(filetemp, "wt") as ftemp:
         with open(file, "rt") as gin:
