@@ -18,7 +18,7 @@ if [ ! -d $1 -a $1 != "-" ]; then
     done
 fi
 cd $1
-[[ `ls -1|wc -l` -le 200]] && ls $2 || echo 'not printing >200 files'
+[[ `ls -1|wc -l` -le 200 ]] && ls $2 || echo 'not printing >200 files'
 
 
 elif [ -n "$BASH_VERSION" ]; then

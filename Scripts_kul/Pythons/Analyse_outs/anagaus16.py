@@ -17,6 +17,7 @@ def init():
     parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
     parser.add_argument("-o", "--outfile", help="Give name of csv-file")
     parser.add_argument("-f", "--force", help="Force analysis of vertical transition (vt, fc).", action="store_true")
+    parser.add_argument("-g", "--noforce", help="Force analysis of ground state only", action="store_true")
     parser.add_argument("-s", "--space", help="More readable output by adding Space between words. Same as -r",
                         action="store_true")
     parser.add_argument("-r", "--readable", help="More readable output by adding Space between words. Same as -s",
@@ -24,8 +25,18 @@ def init():
     parser.add_argument("-t", "--time", help="Output time in seconds instead of hours.", action="store_true")
     parser.add_argument("-e", "--effi", help="Output efficiency instead of time (t_cpu/t_elapsed).", action="store_true")
     args = parser.parse_args()
+
     if args.effi:
         args.time = True
+
+    force=0
+    if args.noforce and args.force:
+        print('force and noforce not compatible, using default')
+    elif args.force:
+        force=1
+    elif args.noforce:
+        force=-1
+
     if args.outfile:
         csvname = Path(args.outfile).expanduser().absolute()
     else:
@@ -53,7 +64,7 @@ def init():
             with open(flname, 'r') as fl:
                 if 'Entering Gaussian System' not in fl.read():  # (faster than re.search)
                     continue
-            main(flname, outname=csvname, fc=args.force, t_unit=args.time, eff=args.effi)
+            main(flname, outname=csvname, fc=force, t_unit=args.time, eff=args.effi)
         except UnicodeError:
             continue
 
@@ -91,7 +102,7 @@ def init():
         exit(1)
 
 
-def main(filename, outname, fc=False, t_unit=False, eff=False):
+def main(filename, outname, fc=0, t_unit=False, eff=False):
     basename = filename.name
 
     # noinspection PyTypeChecker
@@ -147,7 +158,7 @@ def main(filename, outname, fc=False, t_unit=False, eff=False):
 
     with open(outname, 'a') as f:
         csvw = csv.writer(f)
-        if fc or re.search("[Ff][Cc].*[.]log", basename):
+        if fc!=-1 and (fc==1 or re.search("[Ff][Cc].*[.]log", basename)):
             logFCout(filename, csvw)
         elif re.search("[.]log", basename):
             log1out(filename, csvw)
