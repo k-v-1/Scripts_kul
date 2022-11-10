@@ -17,7 +17,7 @@ def init():
     parser.add_argument("-w", help="Force writing of csv-file, even if -v option is enabled", action="store_true")
     parser.add_argument("-o", "--outfile", help="Give name of csv-file")
     parser.add_argument("-f", "--force", help="Force analysis of vertical transition (vt, fc).", action="store_true")
-    parser.add_argument("-g", "--noforce", help="Force analysis of ground state only", action="store_true")
+    parser.add_argument("-g", "--ground", help="Force analysis of ground state only", action="store_true")
     parser.add_argument("-s", "--space", help="More readable output by adding Space between words. Same as -r",
                         action="store_true")
     parser.add_argument("-r", "--readable", help="More readable output by adding Space between words. Same as -s",
@@ -30,11 +30,11 @@ def init():
         args.time = True
 
     force=0
-    if args.noforce and args.force:
-        print('force and noforce not compatible, using default')
+    if args.ground and args.force:
+        print('force and ground not compatible, using default')
     elif args.force:
         force=1
-    elif args.noforce:
+    elif args.ground:
         force=-1
 
     if args.outfile:
