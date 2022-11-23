@@ -159,7 +159,8 @@ def getgbas(filename):
 def grepcoord(filename, prog='gaus'):
     nats = get_nats(filename, prog=prog)
     if re.search('gaus', prog, re.IGNORECASE):
-        script = f'grep -a -A{nats+4:d} "Standard orientation" {str(filename)} | tail -n{nats:d} '
+        # script = f'grep -a -A{nats+4:d} "Standard orientation" {str(filename)} | tail -n{nats:d} '
+        script = f'grep -a -A{nats+2:d} "Coordinates (Angstroms)" {str(filename)} | tail -n {nats:d}'
     elif re.search('qchem', prog, re.IGNORECASE):
         script = f'grep -a -A{nats+2:d} "Standard Nuclear Orientation (Angstroms)" {str(filename)} | tail -n{nats:d} '
     else:
