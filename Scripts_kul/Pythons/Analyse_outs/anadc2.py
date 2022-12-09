@@ -116,7 +116,7 @@ def init():
                                 f"{fun(ll[8], 3)},{fun(ll[9], 4)},{fun(ll[10], 7)},{fun(ll[11], 6)} ,|"
                                 f"{fun(ll[12], 3)},{fun(ll[13], 4)},{fun(ll[14], 7)},{fun(ll[15], 6)}")
                 else:
-                    [print(line.rstrip()) for line in csvfile.readlines()]
+                    [print(line.rstrip().replace(',6,0,0,0','').replace(',5,0,0,0','').replace(',4,0,0,0','')) for line in csvfile.readlines()]
             if not args.w and not args.outfile:
                 csvname.unlink()
     else:
