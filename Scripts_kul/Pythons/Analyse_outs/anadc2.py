@@ -41,33 +41,40 @@ def init():
         csvname = Path(args.outfile).expanduser().absolute()
     else:
         csvname = Path.cwd().joinpath('results.csv').expanduser().absolute()
-    if csvname.is_file():
+
+    def file_parser_2_main():
+        fls = []
+        for dirdir in args.dirname:
+            drg = Path(dirdir).expanduser().absolute()
+            if drg.is_file():
+                fls.append(drg)
+            elif drg.is_dir():
+                [fls.append(k) for k in drg.glob('./*') if k.is_file()]  # filter out all subdirs
+            else:
+                print('\"%s\" is no file or dir?' % dirdir)
+                continue
+        fls.sort()  # in or out the loop? eg do i want to keep user sequence?
+        for flname in fls:
+            try:
+                with open(flname, 'r') as fl:
+                    # if not 'TURBOMOLE V7.1' not in fl.read():  # (faster than re.search)
+                    if not re.search(r'ricc2 .* TURBOMOLE V7\.1', fl.read(2000), re.MULTILINE):
+                        continue
+                main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi, roundnum=addspace, tote=args.Etot, tdm=args.TDM)
+            except UnicodeError:
+                continue
+
+    if not csvname.is_file():
+        file_parser_2_main()
+    else:
         yn = input("file already exist, overwrite? [y/n] ")
         if 'y' in yn:
             csvname.unlink()
+            file_parser_2_main()
         else:
-            exit(0)
-
-    fls = []
-    for dirdir in args.dirname:
-        drg = Path(dirdir).expanduser().absolute()
-        if drg.is_file():
-            fls.append(drg)
-        elif drg.is_dir():
-            [fls.append(k) for k in drg.glob('./*') if k.is_file()]  # filter out all subdirs
-        else:
-            print('\"%s\" is no file or dir?' % dirdir)
-            continue
-    fls.sort()  # in or out the loop? eg do i want to keep user sequence?
-    for flname in fls:
-        try:
-            with open(flname, 'r') as fl:
-                # if not 'TURBOMOLE V7.1' not in fl.read():  # (faster than re.search)
-                if not re.search(r'ricc2 .* TURBOMOLE V7\.1', fl.read(2000), re.MULTILINE):
-                    continue
-            main(flname, outname=csvname, long=args.long, t_unit=args.time, eff=args.effi, roundnum=addspace, tote=args.Etot, tdm=args.TDM)
-        except UnicodeError:
-            continue
+            yn = input("Continue? [y/n] ")
+            if 'n' in yn:
+                exit(0)
 
     if csvname.is_file():
         with open(csvname, 'r+') as csvfile:
@@ -124,10 +131,11 @@ def main(infile, outname, long=False, t_unit=False, eff=False, roundnum=False, t
         csvw = csv.writer(f)
         print(name)  # , filedict)
         filedict = start_ana(infile, t_unit)
+        # print(filedict)
         if eff:
             filedict['wall'] = round(filedict['cpu']/filedict['wall']/filedict['nds']*100,2)
         else:
-            filedict['wall'] = round(filedict['wall'], 2-int(floor(log10(abs(filedict['wall'])))))
+            filedict['wall'] = round(filedict['wall'], 2-int(floor(log10(abs(filedict['wall'])+0.00001))))
         if tote:
             csvw.writerow([name, filedict['mp2_E']])
             [csvw.writerow([es, filedict['esprops'][es]['emmE-au']+filedict['mp2_E']]) for es in filedict['esprops']]
@@ -179,7 +187,7 @@ def dhms2time(d, h, m, s, unit=False):
 
 def start_ana(totfile, t_unit=False):
     filedic = {'mp2_E': 0, 'nds':0, 'cpu':-1, 'wall': -1, 'err': True, 'esprops': None}
-    esdict = {i: {'emmE-eV': 0, 'f': 0, 's2': 0, 'ifcoefs': [], 'tdm': []} for i in range(1, 4)}
+    esdict = {i: {'emmE-eV': 0, 'f': 0, 's2': 0, 'ifcoefs': [], 'tdm': []} for i in range(1, 7)}
 
     with open(totfile, "r") as fl:
         cosmo, ifstart, tdm_start = False, False, False
@@ -242,6 +250,7 @@ def start_ana(totfile, t_unit=False):
             if ifstart:
                 ifmatch = re.search(r' +\| +([0-9]+) a +[0-9]+ +\| +([0-9]+) a +[0-9]+ +\| +[0-9.-]+ +([0-9.]+) +\|', line)
                 if ifmatch is not None:
+                    # print(ifmatch)
                     [esdict[esnumc]['ifcoefs'].append(ifmatch.group(i)) for i in [1,2,3]]
                 if re.search('norm of printed elements', line):
                     ifstart = False
