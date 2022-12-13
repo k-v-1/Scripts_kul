@@ -109,7 +109,10 @@ def get_gaus(fchk):  # get information from g16 fchk-file.
 def orc_coord(output, atnumlst, atweightlst, coordlst):  # append BOHR-coordinates to output. Orca format. All inputs in lists.
     nat = len(atnumlst)
     symlst = [atnum2sym[i] for i in atnumlst]  # Angstrom input, bohr output
-    coordlst_bohr = [i*0.529177249 for i in coordlst]
+
+    # coordlst_bohr = [i*0.529177249 for i in coordlst] #########TODO#################TODO Check this!!!!!!!!
+
+    coordlst_bohr = coordlst
     coordmat = np.array(coordlst_bohr).reshape((nat,3))
 
     with open(output, "a") as f:
