@@ -73,6 +73,7 @@ def init():
     man = '''Additional information:
     l2g file --> from gaussian xx.log, makes xx.gaus file with gaussian coordinates
     l2x file --> from gaussian xx.log, makes xx.xyz file
+    f2x file --> from gaussian xx.fchk, makes xx.xyz file
     o2x file --> from qchem xx.out, makes xx.xyz file
     l2d file -b BASINFO --> from gaussian xx.log, makes xx.dal inputfile
                             possibility to extract bs from log ##might not aways work in dalton##
@@ -85,6 +86,8 @@ def init():
     parser.add_argument("files", type=str, nargs='+', help="add filename[s]")
     parser.add_argument("-t", "--header", action="store_true",
                         help="adds the total number of atoms + title as 2-line-header of xyz-file")
+    parser.add_argument("-s", "--sortxyz", action="store_true",
+                        help="sorts the xyz file, used to be default")
     parser.add_argument("-b", "--basinfo", help="add optional basisset information for [l,x]2d")
     args = parser.parse_args()
     for filename in args.files:
@@ -92,7 +95,9 @@ def init():
         if args.i2j == 'l2g':
             log2gaus(file)
         elif args.i2j == 'l2x':
-            log2xyz(file, header=args.header)
+            log2xyz(file, header=args.header, sortxyz=args.sortxyz)
+        elif args.i2j == 'f2x':
+            fchk2xyz(file, header=args.header)
         elif args.i2j == 'o2x':
             qout2xyz(file, header=args.header)
         elif args.i2j == 'l2d':
@@ -154,6 +159,38 @@ def getgbas(filename):
     return t[0][2]  # returns basis set
 
 
+def fchk2xyz(filename, header=False):
+
+    script = """
+    nats1=($(grep "Atomic numbers" %s |awk '{print int($5/5)+1}' ))
+    grep "Atomic numbers" -A $nats1 %s |tail -n $nats1 | tr '\n' ' '
+    """ % (str(filename), str(filename))
+    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash').stdout.readline().decode('utf8')
+    ats = [atnum2sym[int(i)] for i in p.split()]
+    script = """
+    nats=($(grep "Current cartesian coordinates" %s |awk '{print int($6/5)+1}' ))
+    grep "Current cartesian coordinates" -A $nats %s | tail -n $nats | tr '\n' ' '
+    """ % (str(filename), str(filename))
+    p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash').stdout.readline().decode('utf8')
+    xyzs = [float(i) for i in p.split()]
+    
+
+    outfile = filename.with_suffix('.xyz')
+    with open(outfile, "w") as wr:
+        if header:
+            wr.write(f"{len(ats)}\n")
+            wr.write(f'{filename.relative_to(Path.cwd())}\n')
+        for i in range(len(ats)):
+            s1 = ats[i]
+            f1 = '%.10f' % float(xyzs[3*i]*0.529177249)
+            f2 = '%.10f' % float(xyzs[3*i+1]*0.529177249)
+            f3 = '%.10f' % float(xyzs[3*i+2]*0.529177249)
+            s2 = ' ' * (8 - len(s1)) + str(' ' if '-' not in f1 else '')
+            s3 = ' ' * 5 + str(' ' if '-' not in f2 else '')
+            s4 = ' ' * 5 + str(' ' if '-' not in f3 else '')
+            wr.write(s1 + s2 + f1 + s3 + f2 + s4 + f3 + '\n')
+    return outfile
+
 # gets coordinates from log-file or out-file (qchem)
 # used for log2xyz->xyz2dal, qout2xyz and log2gaus (+ext. coorddiff.py)
 def grepcoord(filename, prog='gaus'):
@@ -171,14 +208,15 @@ def grepcoord(filename, prog='gaus'):
 
 
 # makes xyz from log; replaces .log with .xyz
-def log2xyz(file, header=False):
+def log2xyz(file, header=False, sortxyz=False):
     gn = grepcoord(file)
     if gn == []:
         print(f'no coords found in {file}', file=sys.stderr)
         return
     fn = np.array([tuple(x) for x in gn],
                   dtype=[('c1', int), ('c2', int), ('c3', int), ('c4', float), ('c5', float), ('c6', float)])
-    fn = (np.sort(fn, axis=0, order='c2'))[::-1]
+    if sortxyz:
+        fn = (np.sort(fn, axis=0, order='c2'))[::-1]
 
     outfile = file.with_suffix('.xyz')
     with open(outfile, "w") as wr:
