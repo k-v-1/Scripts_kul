@@ -165,12 +165,17 @@ def fchk2xyz(filename, header=False):
     nats1=($(grep "Atomic numbers" %s |awk '{print ($5<int($5/6)?int($5/6)+1:int($5/6))}' ))
     grep "Atomic numbers" -A $nats1 %s |tail -n $nats1 | tr '\n' ' '
     """ % (str(filename), str(filename))
+    #TODO: maybe natline should be:
+    # nats1=($(grep "Atomic numbers" %s |awk '{print int($5/6+0.9999999999)}' ))
     p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash').stdout.readline().decode('utf8')
     ats = [atnum2sym[int(i)] for i in p.split()]
     script = """
     nats=($(grep "Current cartesian coordinates" %s |awk '{print ($5<int($5/5)?int($5/5)+1:int($5/5))}' ))
     grep "Current cartesian coordinates" -A $nats %s | tail -n $nats | tr '\n' ' '
+    echo
     """ % (str(filename), str(filename))
+    #TODO: maybe natline should be:
+    # nats=($(grep "Current cartesian coordinates" %s |awk '{print int($6/5+0.9999999999)}' ))
     p = subprocess.Popen(script, stdout=subprocess.PIPE, shell=True, executable='/bin/bash').stdout.readline().decode('utf8')
     xyzs = [float(i) for i in p.split()]
     
