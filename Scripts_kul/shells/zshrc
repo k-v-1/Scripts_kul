@@ -47,12 +47,16 @@ export SPROMPT="Correct $fg[red]%R$reset_color to $fg[green]%r$reset_color? [Yes
 #history searching with UP and DOWN
 zle -N history-beginning-search-backward-end history-search-end
 zle -N history-beginning-search-forward-end history-search-end
-bindkey "^[OA" history-beginning-search-backward-end
-bindkey "^[OB" history-beginning-search-forward-end
+bindkey "^[OA" history-beginning-search-backward
+#bindkey "^[OA" history-beginning-search-backward-end
+bindkey "^[OB" history-beginning-search-forward
+#bindkey "^[OB" history-beginning-search-forward-end
 
 [ -f ~/.aliases ] && . ~/.aliases
 # Remap clear-screen since ^L is taken by tmux-vim
 bindkey "^O" clear-screen
+
+compdef _dirs cs  #let cs only autocomplete with directories after TAB
 
 LS_COLORS=$LS_COLORS:'st=8;30:' ; export LS_COLORS
 
@@ -88,9 +92,10 @@ PS1='%(?.%F{green}√.%F{red}?%?)%f %F{yellow}SET2%f%B%F{cyan}${"$(spwd)"//\/h\/
 
 ls
 
+PATH="/home/kk/.local/bin:$PATH"
 stty -ixon
 HOST_IP=$(host `hostname` | grep -oP '(\s)\d+(\.\d+){3}' | tail -1 | awk '{ print $NF }' | tr -d '\r')
-export LIBGL_ALWAYS_INDIRECT=1
+#export LIBGL_ALWAYS_INDIRECT=1
 export DISPLAY=$HOST_IP:0.0
 export NO_AT_BRIDGE=1
 export PULSE_SERVER=tcp:$HOST_IP
@@ -100,14 +105,14 @@ export PULSE_SERVER=tcp:$HOST_IP
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-#__conda_setup="$('/home/u0133458/anaconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+#__conda_setup="$('/home/kk/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
 #if [ $? -eq 0 ]; then
 #    eval "$__conda_setup"
 #else
-#    if [ -f "/home/u0133458/anaconda3/etc/profile.d/conda.sh" ]; then
-#        . "/home/u0133458/anaconda3/etc/profile.d/conda.sh"
+#    if [ -f "/home/kk/miniconda3/etc/profile.d/conda.sh" ]; then
+#        . "/home/kk/miniconda3/etc/profile.d/conda.sh"
 #    else
-#        export PATH="/home/u0133458/anaconda3/bin:$PATH"
+#        export PATH="/home/kk/miniconda3/bin:$PATH"
 #    fi
 #fi
 #unset __conda_setup
