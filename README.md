@@ -15,7 +15,7 @@ usefull scripts for input preparation:
 * littlescripts.py : defines some functions used for other scripts (so needed to let the other scripts work)
 
 
-## Shell-scripts
+## Shellscripts
 See also my other repo for useful submitscripts in dirac.
 * cs : combination of cd, ls and mkdir
 * aliases, vimrc, zshrc, tmux.conf : you might find something usefull here
